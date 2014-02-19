@@ -3,14 +3,16 @@
 	<head>
 		<title>Rule 110 Explorer</title>
 		<script src="jquery-2.1.0.js"></script>
+		<script src="jquery.mousewheel.js"></script>
 		<script src="underscore.js"></script>
 	</head>
 	<body>
 		<ul id="ui_patterns">
 		</ul>
-
-		<canvas id="eca" width="500" height="500"></canvas>
-		<button id="ui_draw">Draw</button>
+		<input id="ui_highlight" type="checkbox">Highlight Patterns</input>
+		<br/>
+		
+		<canvas id="eca" width="500" height="500" style="box-shadow: 0px 0px 5px"></canvas>
 
 		<script src="rule110.js"></script>
 	</body>
