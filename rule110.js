@@ -146,7 +146,6 @@ ECA.prototype.draw = function() {
 };
 
 // adjust canvas size
-console.log($('#col_eca'));
 $('#eca')[0].width = $('#col_eca').width();
 $('#eca')[0].height = $(window).height() - 150;
 

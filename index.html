@@ -10,24 +10,39 @@
 	<body>
 	<div class="container-fluid">
 		<div class="page-header">
-			<h1>Rule 110 Cellular Automata Explorer <small>with cyclic tag system translator</small></h1>
+			<h1>Rule 110 Cellular Automaton Explorer <small>with cyclic tag system translator</small></h1>
 		</div>
 
 		<div class="row">
 			<div class="col-md-3">
 				<div class="panel panel-default">
+					<div class="panel-heading">Cyclic Tag System</div>
+
+					 <div class="panel-body">
+						Initial Word
+						<textarea class="form-control" rows="1">100100100</textarea>
+
+						Production Rules
+						<textarea class="form-control" rows="1">010001,100,100100100,,,</textarea>
+
+						<button class="btn btn-default">Run CTS Directly</button>
+						<button class="btn btn-primary">Translate to CA</button>
+					</div>
+				</div>
+
+				<div class="panel panel-default">
 					<div class="panel-heading">Layers</div>
 					<div class="panel-body">
-					<div class="checkbox">
-					<label>
-						<input id="ui_highlight" type="checkbox">Pattern Highlight
-					</label>
-					</div>
-					<div class="checkbox">
-					<label>
-						<input id="ui_cells" type="checkbox" checked="checked">Raw Cells
-					</label>
-					</div>
+						<div class="checkbox">
+						<label>
+							<input id="ui_highlight" type="checkbox">Pattern Highlight
+						</label>
+						</div>
+						<div class="checkbox">
+						<label>
+							<input id="ui_cells" type="checkbox" checked="checked">Raw Cells
+						</label>
+						</div>
 					</div>
 				</div>
 
