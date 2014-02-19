@@ -8,22 +8,27 @@ var ECA = function() {
 		
 	});
 */
-
-	this.patterns = [
-		{
-			name: "ether",
+	
+	this.patterns = {
+		"ether": {
 			pattern: this.patternFromString("00010011011111"),
-			pattern_str: "00010011011111",
 			key_color: 'rgba(255, 0, 0, 0.8)',
 			base_color: 'rgba(255, 200, 200, 0.8)',
 		},
-	];
-	this.state = this.patternFromString("00010011011111", 10);
+		"A": {
+			pattern: this.patternFromString("00010011010011011111"),
+			key_color: 'rgba(0, 0, 255, 0.8)',
+			base_color: 'rgba(200, 200, 255, 0.8)',
+		}
+	};
+	this.state = this.generateRepetition('ether', 5).concat(this.generateRepetition('A', 1)).concat(this.generateRepetition('ether', 5));
 
-	_.each(this.patterns, function(entry) {
+	var _this = this;
+	_.each(this.patterns, function(entry, name) {
 		var item = $('<li/>');
-		item.append($('<span/>').text(entry.name).css('color', entry.key_color));
-		item.append(' : ' + entry.pattern_str);
+		item.append($('<span/>').text(name).css('color', entry.key_color));
+		item.append(' : ' + _this.patternToString(entry.pattern));
+		item.append(' N=' + entry.pattern.length);
 		$('#ui_patterns').append(item);
 	});
 	
@@ -32,27 +37,31 @@ var ECA = function() {
 	this.timestamp = 0;
 };
 
-ECA.prototype.patternFromString = function(s, n) {
-	if(n === undefined) {
-		n = 1;
-	}
+ECA.prototype.patternToString = function(pat) {
+	return _.map(pat, function(v) {
+		return v ? '1' : '0';
+	}).join('');
+};
 
-	var pat = _.map(s, function(v) {
+ECA.prototype.patternFromString = function(s) {
+	return _.map(s, function(v) {
 		return v == '1';
 	});
+};
 
+ECA.prototype.generateRepetition = function(name, n) {
 	var result = [];
 	_.each(_.range(n), function() {
-		result = result.concat(pat);
-	});
+		result = result.concat(this.patterns[name].pattern);
+	}, this);
 	return result;
 };
 
 ECA.prototype.step = function() {
 	var _this = this;
 	new_state = _.map(this.state, function(v_c, ix) {
-		var v_l = (ix - 1 < 0) ? false : _this.state[ix - 1];
-		var v_r = (ix + 1 >= _this.state.length) ? false : _this.state[ix + 1];
+		var v_l = (ix - 1 < 0) ? _this.state[_this.state.length - 1] : _this.state[ix - 1];
+		var v_r = (ix + 1 >= _this.state.length) ? _this.state[0] : _this.state[ix + 1];
 
 		// Encode current neighbors to [0, 8) value.
 		var v_enc = (v_l ? 4 : 0) | (v_c ? 2 : 0) | (v_r ? 1 : 0);
