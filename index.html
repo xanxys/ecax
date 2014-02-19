@@ -2,18 +2,48 @@
 <html>
 	<head>
 		<title>Rule 110 Explorer</title>
+		<link href="css/bootstrap.min.css" rel="stylesheet" media="screen">
 		<script src="jquery-2.1.0.js"></script>
 		<script src="jquery.mousewheel.js"></script>
 		<script src="underscore.js"></script>
 	</head>
 	<body>
-		<ul id="ui_patterns">
-		</ul>
-		<input id="ui_highlight" type="checkbox">Highlight Patterns</input>
-		<br/>
-		
-		<canvas id="eca" width="500" height="500" style="box-shadow: 0px 0px 5px"></canvas>
+	<div class="container-fluid">
+		<div class="page-header">
+			<h1>Rule 110 Cellular Automata Explorer <small>with cyclic tag system translator</small></h1>
+		</div>
 
+		<div class="row">
+			<div class="col-md-3">
+				<div class="panel panel-default">
+					<div class="panel-heading">Layers</div>
+					<div class="panel-body">
+					<div class="checkbox">
+					<label>
+						<input id="ui_highlight" type="checkbox">Pattern Highlight
+					</label>
+					</div>
+					<div class="checkbox">
+					<label>
+						<input id="ui_cells" type="checkbox" checked="checked">Raw Cells
+					</label>
+					</div>
+					</div>
+				</div>
+
+				<div class="panel panel-default">
+					<div class="panel-heading">Patterns</div>
+					<div class="panel-body">
+						<ul class="list-group" id="ui_patterns"></ul>
+					</div>
+				</div>
+			</div>
+
+			<div id="col_eca" class="col-md-9">
+				<canvas id="eca" style="box-shadow: 0px 0px 5px"></canvas>
+			</div>
+		</div>
+		</div>
 		<script src="rule110.js"></script>
 	</body>
 </html>

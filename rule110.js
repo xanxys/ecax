@@ -25,7 +25,7 @@ var ECA = function() {
 
 	var _this = this;
 	_.each(this.patterns, function(entry, name) {
-		var item = $('<li/>');
+		var item = $('<li/>').addClass('list-group-item');
 		item.append($('<span/>').text(name).css('color', entry.key_color));
 		item.append(' : ' + _this.patternToString(entry.pattern));
 		item.append(' N=' + entry.pattern.length);
@@ -37,6 +37,16 @@ var ECA = function() {
 	this.timestamp = 0;
 
 	this.zoom = 3;
+	this.tx = 0;
+	this.ty = 0;
+
+	// cache states
+	this.states = [];
+	var curr_state = this.initial_state;
+	_.each(_.range(100), function(t) {
+		this.states.push(curr_state);
+		curr_state = this.step(curr_state);
+	}, this);
 };
 
 ECA.prototype.patternToString = function(pat) {
@@ -79,22 +89,32 @@ ECA.prototype.draw = function() {
 	
 	ctx.fillStyle = 'white';
 	ctx.beginPath();
-	ctx.rect(0, 0, 500, 500);
+	ctx.rect(0, 0, $('#eca')[0].width, $('#eca')[0].height);
 	ctx.fill();
 
 	ctx.save();
 	ctx.scale(this.zoom, this.zoom);
+	ctx.translate(this.tx, this.ty);
+
+	ctx.lineWidth = 0.1;
+	ctx.beginPath();
+	ctx.moveTo(-500, 0);
+	ctx.lineTo(500, 0);
+	ctx.strokeStyle = 'gray';
+	ctx.stroke();
 
 	var _this = this;
-	var state = _this.initial_state;
-	_.each(_.range(100), function(t) {
-		_.each(state, function(v, x) {
-			ctx.beginPath();
-			ctx.rect(x, t, 1, 1);
+	_.each(this.states, function(state, t) {
+		if($('#ui_cells').is(':checked')) {
+			_.each(state, function(v, x) {
+				ctx.beginPath();
+				ctx.rect(x, t, 1, 1);
 
-			ctx.fillStyle = v ? 'rgb(100, 100, 100)' : 'white';
-			ctx.fill();
-		});
+				ctx.fillStyle = v ? 'rgb(100, 100, 100)' : 'white';
+				ctx.fill();
+			});
+		}
+		
 
 		if($('#ui_highlight').is(':checked')) {
 			_.each(state, function(v, x) {
@@ -116,21 +136,46 @@ ECA.prototype.draw = function() {
 				});
 			});
 		}
-
-		state = _this.step(state);
 	});
 
 	ctx.restore();
 
 	setTimeout(function() {
 		_this.draw();
-	}, 100);
+	}, 50);
 };
 
+// adjust canvas size
+console.log($('#col_eca'));
+$('#eca')[0].width = $('#col_eca').width();
+$('#eca')[0].height = $(window).height() - 150;
 
 var eca = new ECA();
 eca.draw();
 
 $('#eca').mousewheel(function(event) {
 	eca.zoom = Math.max(0.2, eca.zoom + event.deltaY * 0.1);
+});
+
+var dragging = false;
+var prev_ev = null;
+$('#eca').mousedown(function(event) {
+	dragging = true;
+});
+
+$('#eca').mouseup(function(event) {
+	dragging = false;
+	prev_ev = null;
+});
+
+$('#eca').mousemove(function(event) {
+	if(!dragging) {
+		return;
+	}
+
+	if(prev_ev !== null) {
+		eca.tx += (event.clientX - prev_ev.clientX) / eca.zoom;
+		eca.ty += (event.clientY - prev_ev.clientY) / eca.zoom;
+	}
+	prev_ev = event;
 });
