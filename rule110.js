@@ -70,6 +70,7 @@ ECA.prototype.getTile = function(ix, it) {
 // initial :: int -> bool
 ECA.prototype.setInitialState = function(initial) {
 	this.initial = initial;
+	this.tiles = {};
 };
 
 ECA.prototype.step = function(state) {
@@ -93,6 +94,7 @@ ECA.prototype.getTileSize = function() {
 
 
 var Explorer110 = function() {
+	var _this = this;
 	this.eca = new ECA(110);
 
 	this.patterns = {
@@ -107,13 +109,26 @@ var Explorer110 = function() {
 			base_color: 'rgba(200, 200, 255, 0.8)',
 		}
 	};
-	this.initial_state = this.generateRepetition('ether', 5)
+	var core_pattern = this.generateRepetition('ether', 5)
 		.concat(this.generateRepetition('A', 1))
 		.concat(this.generateRepetition('ether', 5))
 		.concat(this.generateRepetition('A', 1))
 		.concat(this.generateRepetition('ether', 5));
 
-	var _this = this;
+	this.eca.setInitialState(function(x) {
+		var ether = _this.patterns["ether"].pattern;
+		var n = ether.length;
+		if(x < 0) {
+			return ether[((x % n) + n) % n];
+		} else if(x < core_pattern.length) {
+			return core_pattern[x];
+		} else {
+			return ether[(x - core_pattern.length) % n];
+		}
+
+	});
+
+	
 	_.each(this.patterns, function(entry, name) {
 		var item = $('<li/>').addClass('list-group-item');
 		item.append($('<span/>').text(name).css('color', entry.key_color));
@@ -127,14 +142,6 @@ var Explorer110 = function() {
 	this.zoom = 3;
 	this.tx = 0;
 	this.ty = 0;
-
-	// cache states
-	this.states = [];
-	var curr_state = this.initial_state;
-	_.each(_.range(2000), function(t) {
-		this.states.push(curr_state);
-		curr_state = this.eca.step(curr_state);
-	}, this);
 
 	// cache tile
 	this.tile_size = this.eca.getTileSize();
