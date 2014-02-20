@@ -21,7 +21,11 @@ var ECA = function() {
 			base_color: 'rgba(200, 200, 255, 0.8)',
 		}
 	};
-	this.initial_state = this.generateRepetition('ether', 5).concat(this.generateRepetition('A', 1)).concat(this.generateRepetition('ether', 5));
+	this.initial_state = this.generateRepetition('ether', 5)
+		.concat(this.generateRepetition('A', 1))
+		.concat(this.generateRepetition('ether', 5))
+		.concat(this.generateRepetition('A', 1))
+		.concat(this.generateRepetition('ether', 5));
 
 	var _this = this;
 	_.each(this.patterns, function(entry, name) {
@@ -43,10 +47,14 @@ var ECA = function() {
 	// cache states
 	this.states = [];
 	var curr_state = this.initial_state;
-	_.each(_.range(100), function(t) {
+	_.each(_.range(2000), function(t) {
 		this.states.push(curr_state);
 		curr_state = this.step(curr_state);
 	}, this);
+
+	// cache tile
+	this.tile_size = 1000;
+	this.tile = this.createTile();
 };
 
 ECA.prototype.patternToString = function(pat) {
@@ -84,17 +92,19 @@ ECA.prototype.step = function(state) {
 	});
 };
 
-ECA.prototype.draw = function() {
-	var ctx = $('#eca')[0].getContext('2d');
+ECA.prototype.createTile = function() {
+	var canvas = document.createElement('canvas');
+	canvas.width = this.tile_size;
+	canvas.height = this.tile_size;
 	
+	var ctx = canvas.getContext('2d');
+
 	ctx.fillStyle = 'white';
 	ctx.beginPath();
-	ctx.rect(0, 0, $('#eca')[0].width, $('#eca')[0].height);
+	ctx.rect(0, 0, this.tile_size, this.tile_size);
 	ctx.fill();
 
 	ctx.save();
-	ctx.scale(this.zoom, this.zoom);
-	ctx.translate(this.tx, this.ty);
 
 	ctx.lineWidth = 0.1;
 	ctx.beginPath();
@@ -104,8 +114,13 @@ ECA.prototype.draw = function() {
 	ctx.stroke();
 
 	var _this = this;
-	_.each(this.states, function(state, t) {
-		if($('#ui_cells').is(':checked')) {
+	var enable_cells = $('#ui_cells').is(':checked');
+	var enable_highlight = $('#ui_highlight').is(':checked');
+
+	for(var t = 0; t < Math.min(this.states.length, this.tile_size); t++) {
+		var state = this.states[t];
+
+		if(enable_cells) {
 			_.each(state, function(v, x) {
 				ctx.beginPath();
 				ctx.rect(x, t, 1, 1);
@@ -116,7 +131,7 @@ ECA.prototype.draw = function() {
 		}
 		
 
-		if($('#ui_highlight').is(':checked')) {
+		if(enable_highlight) {
 			_.each(state, function(v, x) {
 				_.each(_this.patterns, function(entry) {
 					var pattern = entry.pattern;
@@ -136,7 +151,29 @@ ECA.prototype.draw = function() {
 				});
 			});
 		}
-	});
+	}
+	ctx.restore();
+	return canvas;
+};
+
+ECA.prototype.notifyUpdate = function() {
+	this.tile = this.createTile();
+};
+
+ECA.prototype.draw = function() {
+	var _this = this;
+	var ctx = $('#eca')[0].getContext('2d');
+	
+	ctx.fillStyle = 'white';
+	ctx.beginPath();
+	ctx.rect(0, 0, $('#eca')[0].width, $('#eca')[0].height);
+	ctx.fill();
+
+	ctx.save();
+	ctx.scale(this.zoom, this.zoom);
+	ctx.translate(this.tx, this.ty);
+
+	ctx.drawImage(this.tile, 0, 0);
 
 	ctx.restore();
 
@@ -162,6 +199,11 @@ $('#eca').mousedown(function(event) {
 	dragging = true;
 });
 
+$('#eca').mouseleave(function(event) {
+	dragging = false;
+	prev_ev = null;
+});
+
 $('#eca').mouseup(function(event) {
 	dragging = false;
 	prev_ev = null;
@@ -177,4 +219,12 @@ $('#eca').mousemove(function(event) {
 		eca.ty += (event.clientY - prev_ev.clientY) / eca.zoom;
 	}
 	prev_ev = event;
+});
+
+$('#ui_cells').change(function(event) {
+	eca.notifyUpdate();
+});
+
+$('#ui_highlight').change(function(event) {
+	eca.notifyUpdate();
 });
