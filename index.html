@@ -7,7 +7,7 @@
 		<script src="jquery.mousewheel.js"></script>
 		<script src="underscore.js"></script>
 	</head>
-	<body style="overflow: hidden">
+	<body>
 	<div class="container-fluid">
 		<div class="page-header">
 			<h1>Rule 110 Cellular Automaton Explorer <small>with cyclic tag system translator</small></h1>
@@ -25,8 +25,32 @@
 						Production Rules
 						<textarea class="form-control" rows="1">010001,100,100100100,,,</textarea>
 
-						<button class="btn btn-default">Run CTS Directly</button>
-						<button class="btn btn-primary">Translate to CA</button>
+						<button class="btn btn-primary">Set CA Initial State</button>
+					</div>
+				</div>
+
+				<div class="panel panel-default">
+					<div class="panel-heading">Glider System</div>
+
+					 <div class="panel-body">
+						Initial Word
+						<textarea class="form-control" rows="1">AAA</textarea>
+						<button class="btn btn-primary">Set CA Initial State</button>
+					</div>
+				</div>
+
+				<div class="panel panel-default">
+					<div class="panel-heading">Initial State</div>
+
+					 <div class="panel-body">
+						Left Periodic Part
+						<textarea id="ui_initial_left" class="form-control" rows="1">0</textarea>
+
+						Center Part
+						<textarea id="ui_initial_center" class="form-control" rows="1">1</textarea>
+
+						Right Periodic Part
+						<textarea id="ui_initial_right" class="form-control" rows="1">0</textarea>
 					</div>
 				</div>
 

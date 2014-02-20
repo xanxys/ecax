@@ -128,6 +128,8 @@ var Explorer110 = function() {
 
 	});
 
+	this.setInitialStateFromUI();
+
 	
 	_.each(this.patterns, function(entry, name) {
 		var item = $('<li/>').addClass('list-group-item');
@@ -158,6 +160,8 @@ Explorer110.prototype.setupGUI = function() {
 	$('#eca')[0].height = $(window).height() - 150;
 
 	$('#eca').mousewheel(function(event) {
+		event.preventDefault();
+
 		// p = event.offsetX,Y must be preserved.
 		// p<canvas> = p<ECA> * zoom + t = p<ECA> * new_zoom + new_t
 
@@ -205,6 +209,34 @@ Explorer110.prototype.setupGUI = function() {
 		_this.notifyUpdate();
 	});
 
+	$('#ui_initial_left').keyup(function(event) {
+		_this.setInitialStateFromUI();
+	});
+
+	$('#ui_initial_center').keyup(function(event) {
+		_this.setInitialStateFromUI();
+	});
+
+	$('#ui_initial_right').keyup(function(event) {
+		_this.setInitialStateFromUI();
+	});
+};
+
+Explorer110.prototype.setInitialStateFromUI = function() {
+	var pat_l = this.patternFromString($('#ui_initial_left').val());
+	var pat_c = this.patternFromString($('#ui_initial_center').val());
+	var pat_r = this.patternFromString($('#ui_initial_right').val());
+
+	this.eca.setInitialState(function(x) {
+		if(x < 0) {
+			return pat_l[((x % pat_l.length) + pat_l.length) % pat_l.length];
+		} else if(x < pat_c.length) {
+			return pat_c[x];
+		} else {
+			return pat_r[(x - pat_c.length) % pat_r.length];
+		}
+	});
+	this.tiles = {};
 };
 
 Explorer110.prototype.patternToString = function(pat) {
