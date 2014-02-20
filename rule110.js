@@ -1,4 +1,5 @@
 
+
 var Tracker = function(duration) {
 	this.timeout = duration + new Date().getTime() / 1000;
 };
@@ -8,6 +9,11 @@ Tracker.prototype.shouldRun = function() {
 	return (t < this.timeout);
 };
 
+// Hashlife for ECA.
+var HashCell = function(rule) {
+	
+
+};
 
 // Infinitely large, deferred elementary cellular automaton.
 // No GUI code here.
@@ -112,12 +118,13 @@ var Explorer110 = function() {
 
 	this.patterns = {
 		"ether": {
-			pattern: this.patternFromString("00010011011111"),
+			pattern: this.patternFromString("11111000100110"),
 			key_color: 'rgba(255, 0, 0, 0.8)',
 			base_color: 'rgba(255, 200, 200, 0.8)',
 		},
 		"A": {
-			pattern: this.patternFromString("00010011010011011111"),
+			//pattern: this.patternFromString("11111000100110100110"),
+			pattern: this.patternFromString("1110"),
 			key_color: 'rgba(0, 0, 255, 0.8)',
 			base_color: 'rgba(200, 200, 255, 0.8)',
 		}
@@ -233,7 +240,41 @@ Explorer110.prototype.setupGUI = function() {
 	$('#ui_initial_right').keyup(function(event) {
 		_this.setInitialStateFromUI();
 	});
+
+	$('#ui_apply_glider').click(function(event) {
+		_this.setInitialStateFromGliders();
+	})
 };
+
+Explorer110.prototype.setInitialStateFromGliders = function() {
+	var a4 = this.patternFromString("1110111011101110");
+	var a4pack = a4
+		.concat(this.replicate(this.patterns["ether"].pattern, 27))
+		.concat(a4)
+		.concat(this.replicate(this.patterns["ether"].pattern, 23))
+		.concat(a4)
+		.concat(this.replicate(this.patterns["ether"].pattern, 25))
+		.concat(a4);
+
+	var bands = a4pack
+		.concat(this.replicate(this.patterns["ether"].pattern, 649))
+		.concat(a4pack)
+		.concat(this.replicate(this.patterns["ether"].pattern, 649))
+		.concat(a4pack);
+
+	$('#ui_initial_left').val(this.patternToString(this.patterns["ether"].pattern));
+	$('#ui_initial_center').val(this.patternToString(bands));
+	$('#ui_initial_right').val(this.patternToString(this.patterns["ether"].pattern));
+	this.setInitialStateFromUI();
+};
+
+Explorer110.prototype.replicate = function(pattern, n) {
+	var ps = [];
+	_.each(_.range(n), function() {
+		ps = ps.concat(pattern);
+	});
+	return ps;
+}
 
 Explorer110.prototype.setInitialStateFromUI = function() {
 	var pat_l = this.patternFromString($('#ui_initial_left').val());
