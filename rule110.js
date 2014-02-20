@@ -157,7 +157,7 @@ Explorer110.prototype.setupGUI = function() {
 		var center_x_eca = (event.offsetX - _this.tx) / _this.zoom;
 		var center_y_eca = (event.offsetY - _this.ty) / _this.zoom;
 		_this.zoom = Math.max(0.2, _this.zoom + event.deltaY * 0.1);
-		
+
 		_this.tx = event.offsetX - center_x_eca * _this.zoom;
 		_this.ty = event.offsetY - center_y_eca * _this.zoom;
 	});
@@ -306,18 +306,38 @@ Explorer110.prototype.run = function() {
 	ctx.rect(0, 0, $('#eca')[0].width, $('#eca')[0].height);
 	ctx.fill();
 
+	// Draw visible tiles
 	ctx.save();
-	
 	ctx.translate(this.tx, this.ty);
 	ctx.scale(this.zoom, this.zoom);
-
-	// Draw visible tiles/
 	_.each(this.getVisibleTileIndices(), function(index) {
 		var ix = index[0];
 		var it = index[1];
 
 		ctx.drawImage(_this.getTile(ix, it), ix * _this.tile_size, it * _this.tile_size);
 	});
+	ctx.restore();
+
+	// Draw ruler (10x10 - 10x100)
+	var exponent = Math.floor(Math.log(this.zoom) / Math.log(10));
+	var fraction = this.zoom / Math.pow(10, exponent);
+
+	ctx.save();
+	ctx.translate(0, $('#eca')[0].height - 20);
+	ctx.beginPath();
+	ctx.rect(0, 0, 100, 20);
+	ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+	ctx.fill();
+
+	ctx.lineWidth = 3;
+	ctx.beginPath();
+	ctx.moveTo(0, 15);
+	ctx.lineTo(fraction * 10, 15);
+	ctx.strokeStyle = '#020F80';
+	ctx.stroke();
+
+	ctx.fillStyle = '#020F80';
+	ctx.fillText(10 * Math.pow(10, -exponent), 0, 10);
 	ctx.restore();
 
 	setTimeout(function() {
