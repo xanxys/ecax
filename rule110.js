@@ -10,10 +10,79 @@ Tracker.prototype.shouldRun = function() {
 };
 
 // Hashlife for ECA.
+// When traversed, the universe will look like a binary tree;
+// however, nodes with same pattern are shared.
 var HashCell = function(rule) {
-	
-
+	this.rule = rule;
 };
+
+HashCell.prototype.step = function(state) {
+	var rule = this.rule;
+
+	return _.map(state, function(v_c, ix) {
+		var v_l = (ix - 1 < 0) ? state[state.length - 1] : state[ix - 1];
+		var v_r = (ix + 1 >= state.length) ? state[0] : state[ix + 1];
+
+		// Encode current neighbors to [0, 8) value.
+		var v_enc = (v_l ? 4 : 0) | (v_c ? 2 : 0) | (v_r ? 1 : 0);
+
+		// Lookup
+		return (rule & (1 << v_enc)) != 0;
+	});
+};
+
+// Immutable node representing 2^n slice of the universe.
+// This constructor is overloaded:
+// * single-value: hc, value
+// * others: hc, left, right
+var HashCellNode = function(hc, arg0, arg1, arg2) {
+	this.hashcell = hc;
+	if(arg1 === undefined) {
+		this.level = 0;
+		this.pattern = [arg0];
+	} else {
+		this.l = arg0;
+		this.r = arg1;
+		this.level = arg0.level + 1;
+		console.assert(this.l.level === this.r.level);
+		console.assert(this.level >= 1);
+
+		if(this.level <= 2) {
+			this.pattern = this.l.pattern.concat(this.r.pattern);
+		}
+	}
+};
+
+// Return a smaller node after 1 step.
+// this = |* *|* *|
+// ret  =   |+ +|
+HashCellNode.prototype.step = function() {
+	console.assert(this.level >= 2);
+	if(this.level == 2) {
+		var new_pattern = this.hashcell.step(this.pattern);
+		return new HashCellNode(this.hashcell,
+			new HashCellNode(this.hashcell, new_pattern[1]),
+			new HashCellNode(this.hashcell, new_pattern[2]));
+	} else {
+		// We want to do this:
+		// this = |0 1 2 3|4 5 6 7|
+		// ret  =     |a b c d|
+		//
+		// We generate two shifted nodes and step them:
+		// |a b| = |1 2 3 4|.step
+		// |c d| = |3 4 5 6|.step
+		var l_part = new HashCellNode(this.hashcell, this.l.l.r, this.l.r.l);
+		var r_part = new HashCellNode(this.hashcell, this.r.r.l, this.r.l.r);
+		var center = new HashCellNode(this.hashcell, this.l.r.r, this.r.l.l);
+
+		var l_shifted = new HashCellNode(this.hashcell, l_part, center);
+		var r_shifted = new HashCellNode(this.hashcell, center, r_part);
+
+		return new HashCellNode(this.hashcell, l_shifted.step(), r_shifted.step());
+	}
+};
+
+
 
 // Infinitely large, deferred elementary cellular automaton.
 // No GUI code here.
