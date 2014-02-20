@@ -14,6 +14,13 @@ Tracker.prototype.shouldRun = function() {
 // however, nodes with same pattern are shared.
 var HashCell = function(rule) {
 	this.rule = rule;
+	this.new_id = 0;
+	this.cache = {};
+	this.setInitialState(function(x) {
+		return x === 0;
+	});
+
+	this.tile_size = 256;
 };
 
 HashCell.prototype.step = function(state) {
@@ -31,12 +38,92 @@ HashCell.prototype.step = function(state) {
 	});
 };
 
+HashCell.prototype.setInitialState = function(initial) {
+	var _this = this;
+	this.initial = initial;
+
+	// Create HashCellNode that spans [dx, dx + 2^level).
+	var create = function(dx, level) {
+		if(level === 0) {
+			return _this.createCanonicalNode(initial(dx));
+		} else {
+			return _this.createCanonicalNode(
+				create(dx, level - 1),
+				create(dx + Math.pow(2, level - 1), level - 1));
+		}
+	};
+
+	// [-2^(level-1), 2^(level-1))
+	var level = 16;
+	this.root = create(-Math.pow(2, level - 1), level);
+};
+
+HashCell.prototype.getTileSize = function() {
+	return this.tile_size;
+};
+
+HashCell.prototype.getTile = function(ix, it, tr) {
+	var _this = this;
+	console.assert(it >= 0);
+	var index = [ix, it];
+
+	var x = ix * this.tile_size;
+	var find = function(node, dx) {
+		if(x < dx) {
+			return null;
+		} else if(x >= dx + Math.pow(2, node.level)) {
+			return null;
+		} else if(x < dx + Math.pow(2, node.level - 1)) {
+			if(Math.pow(2, node.level) === _this.tile_size) {
+				return node;
+			} else {
+				return find(node.l, dx);
+			}
+		} else {
+			return find(node.r, dx + Math.pow(2, node.level - 1));
+		}
+	};
+
+	var node_slice = find(this.root, -Math.pow(2, this.root.level - 1));
+	if(node_slice === null) {
+		return null;
+	} else {
+		var slice = node_slice.getPattern();
+		return _.map(_.range(this.tile_size), function() {
+			return slice;
+		});
+	}
+};
+
+// Behaviorally same as new HashCellNode(this, ...).
+// This method ensured the created HashCellNode is shared to maximum extent.
+HashCell.prototype.createCanonicalNode = function(arg0, arg1) {
+	var node = new HashCellNode(this, arg0, arg1);
+	var node_existing = this.cache[node.hash()];
+	if(node_existing === undefined) {
+		// Register new node and return.
+		this.cache[node.hash()] = node;
+		return node;
+	} else {
+		// Return existing node (newly issued id will be discarded)
+		return node_existing;
+	}
+};
+
+HashCell.prototype.issueId = function() {
+	var id = this.new_id;
+	this.new_id += 1;
+	return id;
+};
+
+
 // Immutable node representing 2^n slice of the universe.
 // This constructor is overloaded:
 // * single-value: hc, value
 // * others: hc, left, right
-var HashCellNode = function(hc, arg0, arg1, arg2) {
+var HashCellNode = function(hc, arg0, arg1) {
 	this.hashcell = hc;
+	this.id = hc.issueId();
 	if(arg1 === undefined) {
 		this.level = 0;
 		this.pattern = [arg0];
@@ -51,6 +138,17 @@ var HashCellNode = function(hc, arg0, arg1, arg2) {
 			this.pattern = this.l.pattern.concat(this.r.pattern);
 		}
 	}
+	this.next = null;
+	this.nextExp = null;
+};
+
+// Assuming the nodes are canonical, return a unique hash.
+HashCellNode.prototype.hash = function() {
+	if(this.level === 0) {
+		return "" + this.pattern[0];
+	} else {
+		return this.l.id + ":" + this.r.id;
+	}
 };
 
 // Return a smaller node after 1 step.
@@ -58,11 +156,15 @@ var HashCellNode = function(hc, arg0, arg1, arg2) {
 // ret  =   |+ +|
 HashCellNode.prototype.step = function() {
 	console.assert(this.level >= 2);
-	if(this.level == 2) {
+	if(this.next !== null) {
+		return this.next;
+	}
+
+	if(this.level === 2) {
 		var new_pattern = this.hashcell.step(this.pattern);
-		return new HashCellNode(this.hashcell,
-			new HashCellNode(this.hashcell, new_pattern[1]),
-			new HashCellNode(this.hashcell, new_pattern[2]));
+		this.next = this.hashcell.createCanonicalNode(
+			this.hashcell.createCanonicalNode(new_pattern[1]),
+			this.hashcell.createCanonicalNode(new_pattern[2]));
 	} else {
 		// We want to do this:
 		// this = |0 1 2 3|4 5 6 7|
@@ -71,119 +173,70 @@ HashCellNode.prototype.step = function() {
 		// We generate two shifted nodes and step them:
 		// |a b| = |1 2 3 4|.step
 		// |c d| = |3 4 5 6|.step
-		var l_part = new HashCellNode(this.hashcell, this.l.l.r, this.l.r.l);
-		var r_part = new HashCellNode(this.hashcell, this.r.r.l, this.r.l.r);
-		var center = new HashCellNode(this.hashcell, this.l.r.r, this.r.l.l);
+		var l_part = this.hashcell.createCanonicalNode(this.l.l.r, this.l.r.l);
+		var r_part = this.hashcell.createCanonicalNode(this.r.r.l, this.r.l.r);
+		var center = this.hashcell.createCanonicalNode(this.l.r.r, this.r.l.l);
 
-		var l_shifted = new HashCellNode(this.hashcell, l_part, center);
-		var r_shifted = new HashCellNode(this.hashcell, center, r_part);
+		var l_shifted = this.hashcell.createCanonicalNode(l_part, center);
+		var r_shifted = this.hashcell.createCanonicalNode(center, r_part);
 
-		return new HashCellNode(this.hashcell, l_shifted.step(), r_shifted.step());
+		this.next = this.hashcell.createCanonicalNode(l_shifted.step(), r_shifted.step());
 	}
+	return this.next;
 };
 
-
-
-// Infinitely large, deferred elementary cellular automaton.
-// No GUI code here.
-var ECA = function(rule) {
-	this.rule = rule;
-
-	this.initial = function(x) {
-		return (x == 0);
-	};
-
-	// cache tile
-	this.tile_size = 200;
-	this.tiles = {};
-};
-
-// To update a tile (ix, it), we use last values from (ix-1, it) and (ix+1, it).
-// e.g. tile_size = 3
-// |+++|+++|+++|
-// -------------
-// |-++|+++|++-|
-// |--+|+++|+--|
-// |---|+++|---|
-ECA.prototype.updateTile = function(ix, it, tr) {
-	if(!tr.shouldRun()) {
-		return null;
+// Return a smaller node after 2^(level-2) step.
+// this = |* *|* *|
+// ret  =   |+ +|
+HashCellNode.prototype.stepExp = function() {
+	console.assert(this.level >= 2);
+	if(this.nextExp !== null) {
+		return this.nextExp;
 	}
 
-	var states = [];
-	if(it == 0) {
-		// Use supplied initial value function.
-		var x0 = (ix - 1) * this.tile_size;
-		var x1 = (ix + 2) * this.tile_size;
-
-		var state = _.map(_.range(x0, x1), this.initial);	
-		for(var t = 0; t < this.tile_size; t++) {
-			states.push(state.slice(this.tile_size, this.tile_size * 2));
-			state = this.step(state);
-		}
+	if(this.level === 2) {
+		var new_pattern = this.hashcell.step(this.pattern);
+		this.nextExp = this.hashcell.createCanonicalNode(
+			this.hashcell.createCanonicalNode(new_pattern[1]),
+			this.hashcell.createCanonicalNode(new_pattern[2]));
 	} else {
-		// Use previous tiles' last values.
-		var tn = this.getTile(ix - 1, it - 1, tr);
-		var t0 = this.getTile(ix, it - 1, tr);
-		var tp = this.getTile(ix + 1, it - 1, tr);
-		if(tn === null || t0 === null || tp === null) {
-			return null;
-		}
+		// We want to do this:
+		// this = |0 1 2 3|4 5 6 7|
+		// ret  =     |a b c d|
+		// Basically we need to run 2 consecutive stepExp at level - 1.
+		//
+		// 1st:
+		// |1 2| = |0 1 2 3|.stepExp
+		// |3 4| = |2 3 4 5|.stepExp
+		// |5 6| = |4 5 6 7|.stepExp
+		// 2nd:
+		// |a b| = |1 2 3 4|.stepExp
+		// |c d| = |3 4 5 6|.stepExp
+		var l_part = this.l.stepExp();
+		var r_part = this.r.stepExp();
+		var center = this.hashcell.createCanonicalNode(this.l.r, this.r.l).stepExp();
 
-		var state = tn[this.tile_size - 1].concat(
-			t0[this.tile_size - 1]).concat(
-			tp[this.tile_size - 1]);
-		for(var t = 0; t < this.tile_size; t++) {
-			state = this.step(state);
-			states.push(state.slice(this.tile_size, this.tile_size * 2));
-		}
+		var l_shifted = this.hashcell.createCanonicalNode(l_part, center).stepExp();
+		var r_shifted = this.hashcell.createCanonicalNode(center, r_part).stepExp();
+
+		this.nextExp = this.hashcell.createCanonicalNode(l_shifted, r_shifted);
 	}
-	return states;
+	return this.nextExp;
 };
 
-// If immediate: may return null when it takes time to calculate the tile.
-ECA.prototype.getTile = function(ix, it, tr) {
-	console.assert(it >= 0);
-	var index = [ix, it];
-	if(this.tiles[index] === undefined) {
-		var tile = this.updateTile(ix, it, tr);
-		if(tile !== null) {
-			this.tiles[index] = tile;
-		}
-		return tile;
+HashCellNode.prototype.getPattern = function() {
+	if(this.pattern !== undefined) {
+		return this.pattern;
+	} else {
+		return this.l.getPattern().concat(this.r.getPattern());
 	}
-	return this.tiles[index];
-};
-
-// initial :: int -> bool
-ECA.prototype.setInitialState = function(initial) {
-	this.initial = initial;
-	this.tiles = {};
-};
-
-ECA.prototype.step = function(state) {
-	var rule = this.rule;
-
-	return _.map(state, function(v_c, ix) {
-		var v_l = (ix - 1 < 0) ? state[state.length - 1] : state[ix - 1];
-		var v_r = (ix + 1 >= state.length) ? state[0] : state[ix + 1];
-
-		// Encode current neighbors to [0, 8) value.
-		var v_enc = (v_l ? 4 : 0) | (v_c ? 2 : 0) | (v_r ? 1 : 0);
-
-		// Lookup
-		return (rule & (1 << v_enc)) != 0;
-	});
-};
-
-ECA.prototype.getTileSize = function() {
-	return this.tile_size;
 };
 
 
 var Explorer110 = function() {
 	var _this = this;
-	this.eca = new ECA(110);
+	this.eca = new HashCell(110);  // new ECA(110);
+	console.log(this.eca.root.stepExp());
 
 	this.patterns = {
 		"ether": {
