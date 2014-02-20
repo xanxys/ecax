@@ -309,7 +309,9 @@ Explorer110.prototype.getTile = function(ix, it, tr) {
 
 
 	var data = this.eca.getTile(ix, it, tr);
-	if(data === null || !tr.shouldRun()) {
+	var data_l = this.eca.getTile(ix - 1, it, tr);
+	var data_r = this.eca.getTile(ix + 1, it, tr);
+	if(data === null || data_l === null || data_r === null || !tr.shouldRun()) {
 		return null;
 	}
 
@@ -327,12 +329,15 @@ Explorer110.prototype.getTile = function(ix, it, tr) {
 		}
 
 		if(enable_highlight) {
-			_.each(state, function(v, x) {
+			var ext_state = data_l[t].concat(data[t]).concat(data_r[t]);
+
+			_.each(ext_state, function(v, ext_x) {
+				var x = ext_x - _this.tile_size;
 				_.each(_this.patterns, function(entry) {
 					var pattern = entry.pattern;
 
 					var x_end = x + pattern.length;
-					if(_.isEqual(state.slice(x, x_end), pattern)) {
+					if(_.isEqual(ext_state.slice(x + _this.tile_size, x_end + _this.tile_size), pattern)) {
 						ctx.beginPath();
 						ctx.rect(x, t, pattern.length, 1);
 						ctx.fillStyle = entry.base_color;
