@@ -1,4 +1,14 @@
 
+var Tracker = function(duration) {
+	this.timeout = duration + new Date().getTime() / 1000;
+};
+
+Tracker.prototype.shouldRun = function() {
+	var t = new Date().getTime() / 1000;
+	return (t < this.timeout);
+};
+
+
 // Infinitely large, deferred elementary cellular automaton.
 // No GUI code here.
 var ECA = function(rule) {
@@ -8,16 +18,8 @@ var ECA = function(rule) {
 		return (x == 0);
 	};
 
-	// cache states
-	this.states = [];
-	var curr_state = this.initial_state;
-	_.each(_.range(2000), function(t) {
-		this.states.push(curr_state);
-		curr_state = this.step(curr_state);
-	}, this);
-
 	// cache tile
-	this.tile_size = 250;
+	this.tile_size = 200;
 	this.tiles = {};
 };
 
@@ -28,9 +30,12 @@ var ECA = function(rule) {
 // |-++|+++|++-|
 // |--+|+++|+--|
 // |---|+++|---|
-ECA.prototype.updateTile = function(ix, it) {
-	var states = [];
+ECA.prototype.updateTile = function(ix, it, tr) {
+	if(!tr.shouldRun()) {
+		return null;
+	}
 
+	var states = [];
 	if(it == 0) {
 		// Use supplied initial value function.
 		var x0 = (ix - 1) * this.tile_size;
@@ -43,9 +48,12 @@ ECA.prototype.updateTile = function(ix, it) {
 		}
 	} else {
 		// Use previous tiles' last values.
-		var tn = this.getTile(ix - 1, it - 1);
-		var t0 = this.getTile(ix, it - 1);
-		var tp = this.getTile(ix + 1, it - 1);
+		var tn = this.getTile(ix - 1, it - 1, tr);
+		var t0 = this.getTile(ix, it - 1, tr);
+		var tp = this.getTile(ix + 1, it - 1, tr);
+		if(tn === null || t0 === null || tp === null) {
+			return null;
+		}
 
 		var state = tn[this.tile_size - 1].concat(
 			t0[this.tile_size - 1]).concat(
@@ -58,11 +66,16 @@ ECA.prototype.updateTile = function(ix, it) {
 	return states;
 };
 
-ECA.prototype.getTile = function(ix, it) {
+// If immediate: may return null when it takes time to calculate the tile.
+ECA.prototype.getTile = function(ix, it, tr) {
 	console.assert(it >= 0);
 	var index = [ix, it];
 	if(this.tiles[index] === undefined) {
-		this.tiles[index] = this.updateTile(ix, it);
+		var tile = this.updateTile(ix, it, tr);
+		if(tile !== null) {
+			this.tiles[index] = tile;
+		}
+		return tile;
 	}
 	return this.tiles[index];
 };
@@ -167,7 +180,7 @@ Explorer110.prototype.setupGUI = function() {
 
 		var center_x_eca = (event.offsetX - _this.tx) / _this.zoom;
 		var center_y_eca = (event.offsetY - _this.ty) / _this.zoom;
-		_this.zoom = Math.max(0.2, _this.zoom + event.deltaY * 0.1);
+		_this.zoom = Math.min(10, Math.max(0.05, _this.zoom + event.deltaY * 0.1));
 
 		_this.tx = event.offsetX - center_x_eca * _this.zoom;
 		_this.ty = event.offsetY - center_y_eca * _this.zoom;
@@ -263,8 +276,8 @@ Explorer110.prototype.notifyUpdate = function() {
 	this.tiles = {};
 };
 
-
-Explorer110.prototype.getTile = function(ix, it) {
+// If immediate: may return null when it takes time to calculate the tile.
+Explorer110.prototype.getTile = function(ix, it, tr) {
 	var index = [ix, it];
 	if(this.tiles[index] !== undefined) {
 		return this.tiles[index];
@@ -295,7 +308,11 @@ Explorer110.prototype.getTile = function(ix, it) {
 	var enable_highlight = $('#ui_highlight').is(':checked');
 
 
-	var data = this.eca.getTile(ix, it);
+	var data = this.eca.getTile(ix, it, tr);
+	if(data === null || !tr.shouldRun()) {
+		return null;
+	}
+
 	for(var t = 0; t < this.tile_size; t++) {
 		var state = data[t];
 
@@ -335,8 +352,7 @@ Explorer110.prototype.getTile = function(ix, it) {
 	return canvas;
 };
 
-
-Explorer110.prototype.run = function() {
+Explorer110.prototype.redraw = function() {
 	var _this = this;
 	var ctx = $('#eca')[0].getContext('2d');
 	
@@ -346,6 +362,7 @@ Explorer110.prototype.run = function() {
 	ctx.fill();
 
 	// Draw visible tiles
+	var tr = new Tracker(0.1);
 	ctx.save();
 	ctx.translate(this.tx, this.ty);
 	ctx.scale(this.zoom, this.zoom);
@@ -353,7 +370,13 @@ Explorer110.prototype.run = function() {
 		var ix = index[0];
 		var it = index[1];
 
-		ctx.drawImage(_this.getTile(ix, it), ix * _this.tile_size, it * _this.tile_size);
+		var tile = _this.getTile(ix, it, tr);
+		if(tile !== null) {
+			ctx.drawImage(tile, ix * _this.tile_size, it * _this.tile_size);
+		} else {
+			ctx.fillStyle = '#333';
+			ctx.fillText("calculating", (ix + 0.5) * _this.tile_size, (it + 0.5) * _this.tile_size);
+		}
 	});
 	ctx.restore();
 
@@ -380,8 +403,13 @@ Explorer110.prototype.run = function() {
 	ctx.restore();
 
 	setTimeout(function() {
-		_this.run();
+		_this.redraw();
 	}, 100);
+};
+
+
+Explorer110.prototype.run = function() {
+	this.redraw();
 };
 
 Explorer110.prototype.getVisibleTileIndices = function() {
