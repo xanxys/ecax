@@ -54,7 +54,7 @@ HashCell.prototype.setInitialState = function(initial) {
 	};
 
 	// [-2^(level-1), 2^(level-1))
-	var level = 16;
+	var level = 20;
 	this.root = create(-Math.pow(2, level - 1), level);
 };
 
@@ -662,12 +662,29 @@ Explorer110.prototype.redraw = function() {
 	ctx.stroke();
 
 	ctx.fillStyle = '#020F80';
-	ctx.fillText(10 * Math.pow(10, -exponent), 0, 10);
+	ctx.fillText(this.generateExponentWithUnit(10 * Math.pow(10, -exponent)), 0, 10);
 	ctx.restore();
 
 	setTimeout(function() {
 		_this.redraw();
 	}, 100);
+};
+
+// 100 -> "100"
+// 1000 -> "1k"
+// 10000 -> "10k"
+// ...
+Explorer110.prototype.generateExponentWithUnit = function(n) {
+	var units = ["", "k", "M", "G", "T"];
+
+	for(var i = 0; i < units.length; i++) {
+		var x = n / Math.pow(1000, i);
+		if(x < 1000) {
+			return x + units[i];
+		}
+	}
+
+	return n;
 };
 
 
