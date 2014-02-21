@@ -288,7 +288,8 @@ var Explorer110 = function() {
 	
 	// Window into ECA.
 	// p<canvas> = p<ECA> * zoom + t
-	this.zoom = 3;
+	//this.zoom = 3;
+	this.zoom = 0.01;
 	this.tx = 0;
 	this.ty = 0;
 
@@ -620,22 +621,26 @@ Explorer110.prototype.redraw = function() {
 	ctx.translate(this.tx, this.ty);
 	ctx.scale(this.zoom, this.zoom);
 
-	var node_desc = this.getVisibleNode();
-	var attachment = this.getAttachment(node_desc.node, tr);
-	if(attachment !== null) {
-		var k = node_desc.width / 256;
-		ctx.translate(node_desc.dx, node_desc.dy);
-		ctx.scale(k, k);
-		ctx.drawImage(attachment, 0, 0);
+	var node_descs = this.getVisibleNodes();
+	_.each(node_descs, function(node_desc) {
+		var attachment = _this.getAttachment(node_desc.node, tr);
+		if(attachment !== null) {
+			ctx.save();
+			var k = node_desc.width / 256;
+			ctx.translate(node_desc.dx, node_desc.dy);
+			ctx.scale(k, k);
+			ctx.drawImage(attachment, 0, 0);
 
-		if(this.debug) {
-			ctx.lineWidth = 1;
-			ctx.strokeStyle = 'limegreen';
-			ctx.beginPath();
-			ctx.rect(0, 0, 256, 128);
-			ctx.stroke();
+			if(_this.debug) {
+				ctx.lineWidth = 1;
+				ctx.strokeStyle = 'limegreen';
+				ctx.beginPath();
+				ctx.rect(0, 0, 256, 128);
+				ctx.stroke();
+			}
+			ctx.restore();
 		}
-	}
+	});
 	ctx.restore();
 
 	// Draw ruler (10x10 - 10x100)
@@ -671,9 +676,13 @@ Explorer110.prototype.run = function() {
 };
 
 
-//return {node:HashCellNode, dx, dy, width}
-Explorer110.prototype.getVisibleNode = function() {
+//return [{node:HashCellNode, dx, dy, width}]
+Explorer110.prototype.getVisibleNodes = function() {
 	var _this = this;
+
+	// Select target level low enough so that attachment zoom falls in
+	// [1, 2). Which means 2^(level-1) * zoom = attachment.width.
+	var target_level = Math.max(0, 1 + Math.floor(Math.log(256 / this.zoom) / Math.log(2)));
 
 	// p<canvas> = p<ECA> * zoom + t
 	// p<ECA> = (p<canvas> - t) / zoom
@@ -682,44 +691,38 @@ Explorer110.prototype.getVisibleNode = function() {
 	var y0 = Math.max(0, -this.ty / this.zoom);
 	var y1 = ($('#eca')[0].height - this.ty) / this.zoom;
 
-	var findSmallestNode = function(node, dx, dy) {
+	var findTargetNodes = function(node, dx, dy) {
 		var w = Math.pow(2, node.level - 1);
 		var h = w / 2;
 
-		var ix = null;
-		var iy = null;
-		if(x1 < dx + w / 2) {
-			// definitely left
-			ix = 0;
-		} else if(dx + w / 2 < x0) {
-			// definitely right
-			ix = 1;
+		// Discard if there's no overlap with the window.
+		if(dx + w < x0 || dx > x1 || dy + h < y0 || dy > y1) {
+			return [];
 		}
 
-		if(y1 < dy + h / 2) {
-			// definitely up
-			iy = 0;
-		} else if(dy + h / 2 < y0) {
-			// definitely down
-			iy = 1;
-		}
-
-		if(ix === null || iy === null || node.level < 3) {
-			// No single children can contain the window
-			// OR current node is already too small.
-			return {
+		// Return as is if this is small enough.
+		if(node.level <= target_level) {
+			return [{
 				node: node,
 				dx: dx,
 				dy: dy,
 				width: w,
-			};
-		} else {
-			return findSmallestNode(_this.getSTDivisions(node)[iy][ix],
-				dx + ix * w / 2, dy + iy * h / 2);
+			}];
 		}
+
+		// Still too large; divide into quads and collect.
+		var quads = _this.getSTDivisions(node);
+		var nodes = [];
+		_.each(_.range(2), function(iy) {
+			_.each(_.range(2), function(ix) {
+				nodes = nodes.concat(
+					findTargetNodes(quads[iy][ix], dx + ix * w / 2, dy + iy * h / 2));
+			});
+		});
+		return nodes;
 	};
 
-	return findSmallestNode(this.eca.root, -Math.pow(2, this.eca.root.level - 2), 0);
+	return findTargetNodes(this.eca.root, -Math.pow(2, this.eca.root.level - 2), 0);
 };
 
 Explorer110.prototype.getVisibleTileIndices = function() {
