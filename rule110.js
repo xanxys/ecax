@@ -118,6 +118,9 @@ HashCell.prototype.issueId = function() {
 
 
 // Immutable node representing 2^n slice of the universe.
+// A 2^(n-1) * 2^(n-2) spatio-temporal region is completely tied to
+// each HashCellNode.
+//
 // This constructor is overloaded:
 // * single-value: hc, value
 // * others: hc, left, right
@@ -140,6 +143,8 @@ var HashCellNode = function(hc, arg0, arg1) {
 	}
 	this.next = null;
 	this.nextExp = null;
+
+	this.stAttachment = null;
 };
 
 // Assuming the nodes are canonical, return a unique hash.
@@ -291,6 +296,8 @@ var Explorer110 = function() {
 	this.tile_size = this.eca.getTileSize();
 	this.tiles = {};
 
+	this.debug = false;
+
 	this.setupGUI();
 };
 
@@ -309,7 +316,7 @@ Explorer110.prototype.setupGUI = function() {
 
 		var center_x_eca = (event.offsetX - _this.tx) / _this.zoom;
 		var center_y_eca = (event.offsetY - _this.ty) / _this.zoom;
-		_this.zoom = Math.min(10, Math.max(0.05, _this.zoom + event.deltaY * 0.1));
+		_this.zoom = Math.min(10, Math.max(1e-4, _this.zoom * (1 + event.deltaY * 0.1)));
 
 		_this.tx = event.offsetX - center_x_eca * _this.zoom;
 		_this.ty = event.offsetY - center_y_eca * _this.zoom;
@@ -439,6 +446,84 @@ Explorer110.prototype.notifyUpdate = function() {
 	this.tiles = {};
 };
 
+// Get 4 nodes that corresponds to quadrants of node.stAttachments.
+Explorer110.prototype.getSTDivisions = function(node) {
+	console.assert(node.level > 3);
+
+	var n0l = node.hashcell.createCanonicalNode(
+		node.hashcell.createCanonicalNode(node.l.l.r, node.l.r.l),
+		node.hashcell.createCanonicalNode(node.l.r.r, node.r.l.l));
+	var n0r = node.hashcell.createCanonicalNode(
+		node.hashcell.createCanonicalNode(node.l.r.r, node.r.l.l),
+		node.hashcell.createCanonicalNode(node.r.l.r, node.r.r.l));
+
+	// lower half
+	var center_q = node.hashcell.createCanonicalNode(node.l.r, node.r.l).stepExp();
+	var l_q = node.l.stepExp();
+	var r_q = node.r.stepExp();
+
+	var n1l = node.hashcell.createCanonicalNode(l_q, center_q);
+	var n1r = node.hashcell.createCanonicalNode(center_q, r_q);
+
+	return [[n0l, n0r], [n1l, n1r]];
+};
+
+Explorer110.prototype.getAttachment = function(node, tr) {
+	if(node.level <= 2) {
+		return null;
+	}
+
+	if(node.stAttachment !== null) {
+		return node.stAttachment;
+	}
+
+	if(!tr.shouldRun()) {
+		return null;
+	}
+
+	//console.log('GA', node.level);
+
+	var canvas = document.createElement('canvas');
+	canvas.width = 256;
+	canvas.height = 128;
+
+	var ctx = canvas.getContext('2d');
+	if(node.level > 3) {
+		var quads = this.getSTDivisions(node);
+
+		var i0l = this.getAttachment(quads[0][0], tr);
+		var i0r = this.getAttachment(quads[0][1], tr);
+		var i1l = this.getAttachment(quads[1][0], tr);
+		var i1r = this.getAttachment(quads[1][1], tr);
+		if(i0l === null || i0r === null || i1l === null || i1r === null) {
+			return null;
+		}
+
+		ctx.drawImage(i0l, 0, 0, 128, 64);
+		ctx.drawImage(i0r, 128, 0, 128, 64);
+		ctx.drawImage(i1l, 0, 64, 128, 64);
+		ctx.drawImage(i1r, 128, 64, 128, 64);
+	} else {
+		console.assert(node.level === 3);
+		ctx.save();
+		ctx.scale(256 / 4, 256 / 4);
+		var slice = node.getPattern();
+		for(var t = 0; t < 2; t++) {
+			for(var x = 0; x < 4; x++) {
+				var v = slice[x + 2];
+				ctx.beginPath();
+				ctx.rect(x, t, 1, 1);
+				ctx.fillStyle = v ? 'rgb(100, 100, 100)' : 'white';
+				ctx.fill();
+			}
+			slice = node.hashcell.step(slice);
+		}
+		ctx.restore();
+	}
+	node.stAttachment = canvas;
+	return canvas;
+};
+
 // If immediate: may return null when it takes time to calculate the tile.
 Explorer110.prototype.getTile = function(ix, it, tr) {
 	var index = [ix, it];
@@ -534,18 +619,23 @@ Explorer110.prototype.redraw = function() {
 	ctx.save();
 	ctx.translate(this.tx, this.ty);
 	ctx.scale(this.zoom, this.zoom);
-	_.each(this.getVisibleTileIndices(), function(index) {
-		var ix = index[0];
-		var it = index[1];
 
-		var tile = _this.getTile(ix, it, tr);
-		if(tile !== null) {
-			ctx.drawImage(tile, ix * _this.tile_size, it * _this.tile_size);
-		} else {
-			ctx.fillStyle = '#333';
-			ctx.fillText("calculating", (ix + 0.5) * _this.tile_size, (it + 0.5) * _this.tile_size);
+	var node_desc = this.getVisibleNode();
+	var attachment = this.getAttachment(node_desc.node, tr);
+	if(attachment !== null) {
+		var k = node_desc.width / 256;
+		ctx.translate(node_desc.dx, node_desc.dy);
+		ctx.scale(k, k);
+		ctx.drawImage(attachment, 0, 0);
+
+		if(this.debug) {
+			ctx.lineWidth = 1;
+			ctx.strokeStyle = 'limegreen';
+			ctx.beginPath();
+			ctx.rect(0, 0, 256, 128);
+			ctx.stroke();
 		}
-	});
+	}
 	ctx.restore();
 
 	// Draw ruler (10x10 - 10x100)
@@ -580,6 +670,58 @@ Explorer110.prototype.run = function() {
 	this.redraw();
 };
 
+
+//return {node:HashCellNode, dx, dy, width}
+Explorer110.prototype.getVisibleNode = function() {
+	var _this = this;
+
+	// p<canvas> = p<ECA> * zoom + t
+	// p<ECA> = (p<canvas> - t) / zoom
+	var x0 = (-this.tx) / this.zoom;
+	var x1 = ($('#eca')[0].width - this.tx) / this.zoom;
+	var y0 = Math.max(0, -this.ty / this.zoom);
+	var y1 = ($('#eca')[0].height - this.ty) / this.zoom;
+
+	var findSmallestNode = function(node, dx, dy) {
+		var w = Math.pow(2, node.level - 1);
+		var h = w / 2;
+
+		var ix = null;
+		var iy = null;
+		if(x1 < dx + w / 2) {
+			// definitely left
+			ix = 0;
+		} else if(dx + w / 2 < x0) {
+			// definitely right
+			ix = 1;
+		}
+
+		if(y1 < dy + h / 2) {
+			// definitely up
+			iy = 0;
+		} else if(dy + h / 2 < y0) {
+			// definitely down
+			iy = 1;
+		}
+
+		if(ix === null || iy === null || node.level < 3) {
+			// No single children can contain the window
+			// OR current node is already too small.
+			return {
+				node: node,
+				dx: dx,
+				dy: dy,
+				width: w,
+			};
+		} else {
+			return findSmallestNode(_this.getSTDivisions(node)[iy][ix],
+				dx + ix * w / 2, dy + iy * h / 2);
+		}
+	};
+
+	return findSmallestNode(this.eca.root, -Math.pow(2, this.eca.root.level - 2), 0);
+};
+
 Explorer110.prototype.getVisibleTileIndices = function() {
 	// p<canvas> = p<ECA> * zoom + t
 	// p<ECA> = (p<canvas> - t) / zoom
@@ -597,5 +739,5 @@ Explorer110.prototype.getVisibleTileIndices = function() {
 	return indices;
 };
 
-
-new Explorer110().run();
+var explorer = new Explorer110();
+explorer.run();
