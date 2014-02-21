@@ -21,6 +21,7 @@ var HashCell = function(rule) {
 	});
 
 	this.tile_size = 256;
+	this.extension_op = null;
 };
 
 HashCell.prototype.step = function(state) {
@@ -48,6 +49,7 @@ HashCell.prototype.setInitialState = function(initial) {
 	this.root = this.createFromInitial(this.dx, level);
 };
 
+// This is original version of createFromInitialInterleaved.
 // Create HashCellNode that spans [dx, dx + 2^level).
 HashCell.prototype.createFromInitial = function(dx, level) {
 	if(level === 0) {
@@ -59,6 +61,56 @@ HashCell.prototype.createFromInitial = function(dx, level) {
 	}
 };
 
+// This version will take at most O(level) time.
+HashCell.prototype.createFromInitialInterleaved = function(dx, level, tr) {
+	var index = dx;
+	var incomplete = [];
+
+	if(this.partial_tree !== undefined && this.partial_tree !== null) {
+		if(dx !== this.partial_tree.dx || level !== this.partial_tree.level) {
+			throw "Calculation parameter changed while in calculation";
+		}
+		index = this.partial_tree.index;
+		incomplete = this.partial_tree.incomplete;
+	}
+	
+	while(index < dx + Math.pow(2, level)) {
+		if(!tr.shouldRun()) {
+			this.partial_tree = {
+				// For sanity check.
+				dx: dx,
+				level: level,
+
+				// Current state
+				index: index,
+				incomplete: incomplete,
+			}
+			return null;
+		}
+
+		incomplete.push(this.createCanonicalNode(this.initial(index)));
+		index += 1;
+
+		// Merge until no subtree is complete: O(level) time
+		while(incomplete.length >= 2) {
+			var curr = incomplete.pop();
+			var prev = incomplete.pop();
+
+			if(prev.level === curr.level) {
+				incomplete.push(this.createCanonicalNode(prev, curr));
+			} else {
+				// Revert pop*2.
+				incomplete.push(prev);
+				incomplete.push(curr);
+				break;
+			}
+		}
+	}
+	console.assert(incomplete.length === 1);
+	this.partial_tree = null;
+	return incomplete[0];
+};
+
 HashCell.prototype.getRoot = function() {
 	return {
 		dx: this.dx,
@@ -66,25 +118,44 @@ HashCell.prototype.getRoot = function() {
 	};
 };
 
-HashCell.prototype.extendLeft = function() {
+HashCell.prototype.extendLeft = function(tr) {
+	// Ignore operation if another extension is ongoing.
+	if(this.extension_op !== "extendLeft" && this.extension_op !== null) {
+		return;
+	}
+
+	this.extension_op = "extendLeft";
 	var new_dx = this.dx - Math.pow(2, this.root.level);
-	this.root = this.createCanonicalNode(
-		this.createFromInitial(new_dx, this.root.level),
-		this.root);
-	this.dx = new_dx;
+	var subtree = this.createFromInitialInterleaved(new_dx, this.root.level, tr);
+
+	if(subtree !== null) {
+		this.root = this.createCanonicalNode(subtree, this.root);
+		this.dx = new_dx;
+		this.extension_op = null;
+	}
 };
 
-HashCell.prototype.extendRight = function() {
+HashCell.prototype.extendRight = function(tr) {
+	// Ignore operation if another extension is ongoing.
+	if(this.extension_op !== "extendRight" && this.extension_op !== null) {
+		return;
+	}
+
+	this.extension_op = "extendRight";
 	var new_dx = this.dx + Math.pow(2, this.root.level);
-	this.root = this.createCanonicalNode(
-		this.root,
-		this.createFromInitial(new_dx, this.root.level));
+	var subtree = this.createFromInitialInterleaved(new_dx, this.root.level, tr);
+
+	if(subtree !== null) {
+		this.root = this.createCanonicalNode(this.root, subtree);
+		this.extension_op = null;
+	}
 };
 
 HashCell.prototype.getTileSize = function() {
 	return this.tile_size;
 };
 
+// DEPRECATED
 HashCell.prototype.getTile = function(ix, it, tr) {
 	var _this = this;
 	console.assert(it >= 0);
@@ -666,7 +737,7 @@ Explorer110.prototype.redraw = function() {
 	ctx.translate(this.tx, this.ty);
 	ctx.scale(this.zoom, this.zoom);
 
-	var node_descs = this.getVisibleNodes();
+	var node_descs = this.getVisibleNodes(tr);
 	_.each(node_descs, function(node_desc) {
 		var attachment = _this.getAttachment(node_desc.node, tr);
 		
@@ -758,7 +829,7 @@ Explorer110.prototype.run = function() {
 
 
 //return [{node:HashCellNode, dx, dy, width}]
-Explorer110.prototype.getVisibleNodes = function() {
+Explorer110.prototype.getVisibleNodes = function(tr) {
 	var _this = this;
 
 	// Select target level low enough so that attachment zoom falls in
@@ -800,11 +871,11 @@ Explorer110.prototype.getVisibleNodes = function() {
 	// If root is smaller than window, replace root with larger one.
 	var root = this.eca.getRoot();
 	if(win.x0 < root.dx + Math.pow(2, root.node.level - 2)) {
-		this.eca.extendLeft();
+		this.eca.extendLeft(tr);
 	} else if(root.dx + 3 * Math.pow(2, root.node.level - 2) < win.x1) {
-		this.eca.extendRight();
+		this.eca.extendRight(tr);
 	} else if(Math.pow(2, root.node.level - 2) < win.y1) {
-		this.eca.extendLeft();  // in this case, left or right doesn't matter.
+		this.eca.extendLeft(tr);  // in this case, left or right doesn't matter.
 	}
 	
 	return findTargetNodes(root.node, root.dx + Math.pow(2, root.node.level - 2), 0);
