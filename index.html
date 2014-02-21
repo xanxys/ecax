@@ -1,7 +1,7 @@
 <!DOCTYPE HTML>
 <html>
 	<head>
-		<title>Rule 110 Explorer</title>
+		<title>Elementary Cellular Automata Explorer</title>
 		<link href="css/bootstrap.min.css" rel="stylesheet" media="screen">
 		<script src="jquery-2.1.0.js"></script>
 		<script src="jquery.mousewheel.js"></script>
@@ -10,32 +10,18 @@
 	<body>
 	<div class="container-fluid">
 		<div class="page-header">
-			<h1>Rule 110 Cellular Automaton Explorer <small>with cyclic tag system translator</small></h1>
+			<h1>Elementary Cellular Automata Explorer</h1>
 		</div>
 
 		<div class="row">
 			<div class="col-md-3">
 				<div class="panel panel-default">
-					<div class="panel-heading">Cyclic Tag System</div>
+					<div class="panel-heading">Rule</div>
 
 					 <div class="panel-body">
-						Initial Word
-						<textarea class="form-control" rows="1">100100100</textarea>
-
-						Production Rules
-						<textarea class="form-control" rows="1">010001,100,100100100,,,</textarea>
-
-						<button class="btn btn-primary">Set CA Initial State</button>
-					</div>
-				</div>
-
-				<div class="panel panel-default">
-					<div class="panel-heading">Glider System</div>
-
-					 <div class="panel-body">
-						Gliders
-						<textarea class="form-control" rows="1">4A4</textarea>
-						<button id="ui_apply_glider" class="btn btn-primary">Set CA Initial State</button>
+					 	<div class="form-group">
+							<input id="ui_rule" type="text" class="form-control" value="110">
+						</div>
 					</div>
 				</div>
 
@@ -51,29 +37,6 @@
 
 						Right Periodic Part
 						<textarea id="ui_initial_right" class="form-control" rows="1">0</textarea>
-					</div>
-				</div>
-
-				<div class="panel panel-default">
-					<div class="panel-heading">Layers</div>
-					<div class="panel-body">
-						<div class="checkbox">
-						<label>
-							<input id="ui_highlight" type="checkbox">Pattern Highlight
-						</label>
-						</div>
-						<div class="checkbox">
-						<label>
-							<input id="ui_cells" type="checkbox" checked="checked">Raw Cells
-						</label>
-						</div>
-					</div>
-				</div>
-
-				<div class="panel panel-default">
-					<div class="panel-heading">Patterns</div>
-					<div class="panel-body">
-						<ul class="list-group" id="ui_patterns"></ul>
 					</div>
 				</div>
 			</div>

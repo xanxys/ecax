@@ -54,7 +54,7 @@ HashCell.prototype.setInitialState = function(initial) {
 	};
 
 	// [-2^(level-1), 2^(level-1))
-	var level = 20;
+	var level = 10;
 	this.root = create(-Math.pow(2, level - 1), level);
 };
 
@@ -288,9 +288,8 @@ var Explorer110 = function() {
 	
 	// Window into ECA.
 	// p<canvas> = p<ECA> * zoom + t
-	//this.zoom = 3;
-	this.zoom = 0.01;
-	this.tx = 0;
+	this.zoom = 3;
+	this.tx = $('#col_eca').width() / 2;
 	this.ty = 0;
 
 	// cache tile
@@ -373,7 +372,31 @@ Explorer110.prototype.setupGUI = function() {
 
 	$('#ui_apply_glider').click(function(event) {
 		_this.setInitialStateFromGliders();
-	})
+	});
+
+	$('#ui_rule').keyup(function(event) {
+		_this.setRuleFromUI();
+	});
+
+	$(window).resize(function(event) {
+		$('#eca')[0].width = $('#col_eca').width();
+		$('#eca')[0].height = $(window).height() - 150;
+	});
+};
+
+Explorer110.prototype.setRuleFromUI = function() {
+	var rule = parseInt($('#ui_rule').val());
+
+	// Note "==" (checking validity of integer)
+	if(0 <= rule && rule < 256 && rule == $('#ui_rule').val()) {
+		$('#ui_rule').parent().addClass('has-success');
+		$('#ui_rule').parent().removeClass('has-error');
+
+		this.eca = new HashCell(rule);
+	} else {
+		$('#ui_rule').parent().addClass('has-error');
+		$('#ui_rule').parent().removeClass('has-success');
+	}
 };
 
 Explorer110.prototype.setInitialStateFromGliders = function() {
