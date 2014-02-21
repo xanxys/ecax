@@ -669,22 +669,27 @@ Explorer110.prototype.redraw = function() {
 	var node_descs = this.getVisibleNodes();
 	_.each(node_descs, function(node_desc) {
 		var attachment = _this.getAttachment(node_desc.node, tr);
-		if(attachment !== null) {
-			ctx.save();
-			var k = node_desc.width / 256;
-			ctx.translate(node_desc.dx, node_desc.dy);
-			ctx.scale(k, k);
-			ctx.drawImage(attachment, 0, 0);
+		
+		ctx.save();
+		var k = node_desc.width / 256;
+		ctx.translate(node_desc.dx, node_desc.dy);
+		ctx.scale(k, k);
 
-			if(_this.debug) {
-				ctx.lineWidth = 1;
-				ctx.strokeStyle = 'limegreen';
-				ctx.beginPath();
-				ctx.rect(0, 0, 256, 128);
-				ctx.stroke();
-			}
-			ctx.restore();
+		if(attachment !== null) {
+			ctx.drawImage(attachment, 0, 0);
+		} else {
+			ctx.fillStyle = "#020F80";
+			ctx.fillText("Calculating", 64, 64);
 		}
+
+		if(_this.debug) {
+			ctx.lineWidth = 1;
+			ctx.strokeStyle = 'limegreen';
+			ctx.beginPath();
+			ctx.rect(0, 0, 256, 128);
+			ctx.stroke();
+		}
+		ctx.restore();
 	});
 	ctx.restore();
 
