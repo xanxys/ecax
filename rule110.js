@@ -675,7 +675,7 @@ Explorer110.prototype.redraw = function() {
 // 10000 -> "10k"
 // ...
 Explorer110.prototype.generateExponentWithUnit = function(n) {
-	var units = ["", "k", "M", "G", "T"];
+	var units = ["", "k", "M", "G", "T", "P", "E", "Z", "Y"];
 
 	for(var i = 0; i < units.length; i++) {
 		var x = n / Math.pow(1000, i);
