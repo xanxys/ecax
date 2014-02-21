@@ -771,7 +771,7 @@ Explorer110.prototype.redraw = function() {
 	ctx.save();
 	ctx.translate(0, $('#eca')[0].height - 20);
 	ctx.beginPath();
-	ctx.rect(0, 0, 100, 20);
+	ctx.rect(0, 0, 300, 20);
 	ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
 	ctx.fill();
 
@@ -782,8 +782,13 @@ Explorer110.prototype.redraw = function() {
 	ctx.strokeStyle = '#020F80';
 	ctx.stroke();
 
+	var win = this.getWindow();
 	ctx.fillStyle = '#020F80';
-	ctx.fillText(this.generateExponentWithUnit(10 * Math.pow(10, -exponent)), 0, 10);
+	ctx.fillText(
+		this.generateExponentWithUnit(10 * Math.pow(10, -exponent)) +
+		"  x:[" + win.x0.toFixed(1) + "," + win.x1.toFixed(1) +"]" +
+		" t:[" + win.y0.toFixed(1) +"," + win.y1.toFixed(1) + "]",
+		0, 10);
 	ctx.restore();
 
 	// Draw debug string.
