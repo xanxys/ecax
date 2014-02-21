@@ -42,20 +42,43 @@ HashCell.prototype.setInitialState = function(initial) {
 	var _this = this;
 	this.initial = initial;
 
-	// Create HashCellNode that spans [dx, dx + 2^level).
-	var create = function(dx, level) {
-		if(level === 0) {
-			return _this.createCanonicalNode(initial(dx));
-		} else {
-			return _this.createCanonicalNode(
-				create(dx, level - 1),
-				create(dx + Math.pow(2, level - 1), level - 1));
-		}
-	};
-
 	// [-2^(level-1), 2^(level-1))
 	var level = 10;
-	this.root = create(-Math.pow(2, level - 1), level);
+	this.dx = -Math.pow(2, level - 1);
+	this.root = this.createFromInitial(this.dx, level);
+};
+
+// Create HashCellNode that spans [dx, dx + 2^level).
+HashCell.prototype.createFromInitial = function(dx, level) {
+	if(level === 0) {
+		return this.createCanonicalNode(this.initial(dx));
+	} else {
+		return this.createCanonicalNode(
+			this.createFromInitial(dx, level - 1),
+			this.createFromInitial(dx + Math.pow(2, level - 1), level - 1));
+	}
+};
+
+HashCell.prototype.getRoot = function() {
+	return {
+		dx: this.dx,
+		node: this.root,
+	};
+};
+
+HashCell.prototype.extendLeft = function() {
+	var new_dx = this.dx - Math.pow(2, this.root.level);
+	this.root = this.createCanonicalNode(
+		this.createFromInitial(new_dx, this.root.level),
+		this.root);
+	this.dx = new_dx;
+};
+
+HashCell.prototype.extendRight = function() {
+	var new_dx = this.dx + Math.pow(2, this.root.level);
+	this.root = this.createCanonicalNode(
+		this.root,
+		this.createFromInitial(new_dx, this.root.level));
 };
 
 HashCell.prototype.getTileSize = function() {
@@ -240,8 +263,7 @@ HashCellNode.prototype.getPattern = function() {
 
 var Explorer110 = function() {
 	var _this = this;
-	this.eca = new HashCell(110);  // new ECA(110);
-	console.log(this.eca.root.stepExp());
+	this.eca = new HashCell(110);
 
 	this.patterns = {
 		"ether": {
@@ -688,6 +710,20 @@ Explorer110.prototype.redraw = function() {
 	ctx.fillText(this.generateExponentWithUnit(10 * Math.pow(10, -exponent)), 0, 10);
 	ctx.restore();
 
+	// Draw debug string.
+	if(this.debug) {
+		ctx.save();
+		ctx.translate(0, $('#eca')[0].height - 40);
+		ctx.beginPath();
+		ctx.rect(0, 0, 400, 20);
+		ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+		ctx.fill();
+
+		ctx.fillStyle = 'limegreen';
+		ctx.fillText("Root Level:" + this.eca.getRoot().node.level + " / Unique Tile:" + _.size(this.eca.cache) + " / New Id:" + this.eca.new_id, 0, 10);
+		ctx.restore();
+	}
+
 	setTimeout(function() {
 		_this.redraw();
 	}, 100);
@@ -722,21 +758,15 @@ Explorer110.prototype.getVisibleNodes = function() {
 
 	// Select target level low enough so that attachment zoom falls in
 	// [1, 2). Which means 2^(level-1) * zoom = attachment.width.
-	var target_level = Math.max(0, 1 + Math.floor(Math.log(256 / this.zoom) / Math.log(2)));
+	var target_level = Math.max(0, 2 + Math.floor(Math.log(256 / this.zoom) / Math.log(2)));
 
-	// p<canvas> = p<ECA> * zoom + t
-	// p<ECA> = (p<canvas> - t) / zoom
-	var x0 = (-this.tx) / this.zoom;
-	var x1 = ($('#eca')[0].width - this.tx) / this.zoom;
-	var y0 = Math.max(0, -this.ty / this.zoom);
-	var y1 = ($('#eca')[0].height - this.ty) / this.zoom;
-
+	var win = this.getWindow();
 	var findTargetNodes = function(node, dx, dy) {
 		var w = Math.pow(2, node.level - 1);
 		var h = w / 2;
 
 		// Discard if there's no overlap with the window.
-		if(dx + w < x0 || dx > x1 || dy + h < y0 || dy > y1) {
+		if(dx + w < win.x0 || dx > win.x1 || dy + h < win.y0 || dy > win.y1) {
 			return [];
 		}
 
@@ -762,24 +792,40 @@ Explorer110.prototype.getVisibleNodes = function() {
 		return nodes;
 	};
 
-	return findTargetNodes(this.eca.root, -Math.pow(2, this.eca.root.level - 2), 0);
+	// If root is smaller than window, replace root with larger one.
+	var root = this.eca.getRoot();
+	if(win.x0 < root.dx + Math.pow(2, root.node.level - 2)) {
+		this.eca.extendLeft();
+	} else if(root.dx + 3 * Math.pow(2, root.node.level - 2) < win.x1) {
+		this.eca.extendRight();
+	} else if(Math.pow(2, root.node.level - 2) < win.y1) {
+		this.eca.extendLeft();  // in this case, left or right doesn't matter.
+	}
+	
+	return findTargetNodes(root.node, root.dx + Math.pow(2, root.node.level - 2), 0);
 };
 
 Explorer110.prototype.getVisibleTileIndices = function() {
-	// p<canvas> = p<ECA> * zoom + t
-	// p<ECA> = (p<canvas> - t) / zoom
-	var x0 = (-this.tx) / this.zoom / this.tile_size;
-	var x1 = ($('#eca')[0].width - this.tx) / this.zoom / this.tile_size;
-	var y0 = Math.max(0, (-this.ty) / this.zoom / this.tile_size);
-	var y1 = ($('#eca')[0].height - this.ty) / this.zoom / this.tile_size;
-
+	var _this = this;
+	var win = this.getWindow();
 	var indices = [];
-	_.each(_.range(Math.floor(y0), Math.ceil(y1)), function(iy) {
-		_.each(_.range(Math.floor(x0), Math.ceil(x1)), function(ix) {
+	_.each(_.range(Math.floor(win.y0 / _this.tile_size), Math.ceil(win.y1 / _this.tile_size)), function(iy) {
+		_.each(_.range(Math.floor(win.x0 / _this.tile_size), Math.ceil(win.x1 / _this.tile_size)), function(ix) {
 			indices.push([ix, iy]);
 		});
 	});
 	return indices;
+};
+
+Explorer110.prototype.getWindow = function() {
+	// p<canvas> = p<ECA> * zoom + t
+	// p<ECA> = (p<canvas> - t) / zoom
+	return {
+		x0: (-this.tx) / this.zoom,
+		x1: ($('#eca')[0].width - this.tx) / this.zoom,
+		y0: Math.max(0, (-this.ty) / this.zoom),
+		y1: ($('#eca')[0].height - this.ty) / this.zoom,
+	};
 };
 
 var explorer = new Explorer110();
