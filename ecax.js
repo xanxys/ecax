@@ -59,7 +59,54 @@ var RuleView = Backbone.View.extend({
 	}
 });
 
+
+// Create state diagram of (infinite) repetition of length n pattern.
+// The graph consists of 2^n nodes and directed links denotes
+// state transition.
+// All nodes have at least one outgoing edge.
+// Nodes with no incoming edge are Garden of Eden pattern.
+var analyze = function(rule, n) {
+	var numberToPattern = function(x) {
+		return _.map(_.range(n), function(i) {
+			return ((x >> (n - i -1)) & 1) !== 0;
+		});
+	};
+
+	var eca = new ECA(rule);
+
+	var graph = {};
+	_.each(_.range(0, Math.pow(2, n)), function(i) {
+		var seed = numberToPattern(i);
+		var pattern = function(x) {
+			return seed[((x % n) + n) % n];
+		};
+		eca.setInitialState(pattern);
+		var to = eca.getTile(0, 0, new Tracker(0.1))[1].slice(0, n);
+
+		graph[patternToString(seed)] = patternToString(to);
+	});
+	return graph;
+};
+
+// :: Map a b -> Map b [a]
+var transposeMap = function(dict) {
+	var inv_dict = {};
+	_.each(dict, function(value, key) {
+		inv_dict[key] = [];
+	});
+	_.each(dict, function(value, key) {
+		inv_dict[value].push(key);
+	});
+	return inv_dict;
+};
+
+
 var ECAX = function() {
+	/*
+	analyze(110, 1);
+	analyze(110, 2);
+	*/
+
 	var _this = this;
 	this.eca = new HashCell(110);
 
