@@ -31,7 +31,7 @@ ECA.prototype.updateTile = function(ix, it, tr) {
 		var x0 = (ix - 1) * this.tile_size;
 		var x1 = (ix + 2) * this.tile_size;
 
-		var state = _.map(_.range(x0, x1), this.initial);	
+		var state = _.map(_.range(x0, x1), this.initial);
 		for(var t = 0; t < this.tile_size; t++) {
 			states.push(state.slice(this.tile_size, this.tile_size * 2));
 			state = this.step(state);

@@ -73,7 +73,7 @@ HashCell.prototype.createFromInitialInterleaved = function(dx, level, tr) {
 		index = this.partial_tree.index;
 		incomplete = this.partial_tree.incomplete;
 	}
-	
+
 	while(index < dx + Math.pow(2, level)) {
 		if(!tr.shouldRun()) {
 			this.partial_tree = {

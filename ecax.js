@@ -25,7 +25,6 @@ var InitialStateView = Backbone.View.extend({
 	},
 
 	readValues: function() {
-		console.log('A');
 		var pat_l = patternFromString($('#ui_initial_left').val());
 		var pat_c = patternFromString($('#ui_initial_center').val());
 		var pat_r = patternFromString($('#ui_initial_right').val());
@@ -202,7 +201,7 @@ var HashCellView = Backbone.View.extend({
 		var canvas = document.createElement('canvas');
 		canvas.width = this.tile_size;
 		canvas.height = this.tile_size;
-		
+
 		var ctx = canvas.getContext('2d');
 
 		ctx.fillStyle = 'white';
@@ -276,7 +275,7 @@ var HashCellView = Backbone.View.extend({
 	redraw: function() {
 		var _this = this;
 		var ctx = this.$el[0].getContext('2d');
-		
+
 		ctx.fillStyle = 'white';
 		ctx.beginPath();
 		ctx.rect(0, 0, this.$el[0].width, this.$el[0].height);
@@ -291,7 +290,7 @@ var HashCellView = Backbone.View.extend({
 		var node_descs = this.getVisibleNodes(tr);
 		_.each(node_descs, function(node_desc) {
 			var attachment = _this.getAttachment(node_desc.node, tr);
-			
+
 			ctx.save();
 			var k = node_desc.width / 256;
 			ctx.translate(node_desc.dx, node_desc.dy);
@@ -432,7 +431,7 @@ var HashCellView = Backbone.View.extend({
 		} else if(Math.pow(2, root.node.level - 2) < win.y1) {
 			this.eca.extendLeft(tr);  // in this case, left or right doesn't matter.
 		}
-		
+
 		return findTargetNodes(root.node, root.dx + Math.pow(2, root.node.level - 2), 0);
 	},
 
