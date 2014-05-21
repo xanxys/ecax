@@ -460,6 +460,35 @@ var HashCellView = Backbone.View.extend({
 });
 
 
+var RuleView = Backbone.View.extend({
+	el: '#ui_rule',
+	events: {
+		'keyup': 'modifyRule',
+	},
+
+	initialize: function() {
+
+
+	},
+
+	modifyRule: function() {
+		var rule = parseInt(this.$el.val());
+
+		// Note "==" (checking validity of integer)
+		this.$el.parent().removeClass('has-error has-success');
+		if(0 <= rule && rule < 256 && rule == this.$el.val()) {
+			this.$el.parent().addClass('has-success');
+			this.trigger('ruleChange', rule);
+			/*
+			this.eca = new HashCell(rule);
+			this.hashcell_view.eca = this.eca;
+			*/
+		} else {
+			this.$el.parent().addClass('has-error');
+		}
+	}
+});
+
 var ECAX = function() {
 	var _this = this;
 	this.eca = new HashCell(110);
@@ -479,37 +508,20 @@ var ECAX = function() {
 	this.hashcell_view.run();
 
 	this.initial_state_view.readValues();
-
+	this.rule_view = new RuleView();
+	this.rule_view.on('ruleChange', function(rule) {
+		_this.eca = new HashCell(rule);
+		_this.hashcell_view.eca = _this.eca;
+	});
 	this.setupGUI();
 };
 
 ECAX.prototype.setupGUI = function() {
 	var _this = this;
-
-	$('#ui_rule').keyup(function(event) {
-		_this.setRuleFromUI();
-	});
-
 	$(window).resize(function(event) {
-		this.$el[0].width = $('#col_eca').width();
-		this.$el[0].height = $(window).height() - 150;
+		_this.hashcell_view.$el[0].width = $('#col_eca').width();
+		_this.hashcell_view.$el[0].height = $(window).height() - 150;
 	});
-};
-
-ECAX.prototype.setRuleFromUI = function() {
-	var rule = parseInt($('#ui_rule').val());
-
-	// Note "==" (checking validity of integer)
-	if(0 <= rule && rule < 256 && rule == $('#ui_rule').val()) {
-		$('#ui_rule').parent().addClass('has-success');
-		$('#ui_rule').parent().removeClass('has-error');
-
-		this.eca = new HashCell(rule);
-		this.hashcell_view.eca = this.eca;
-	} else {
-		$('#ui_rule').parent().addClass('has-error');
-		$('#ui_rule').parent().removeClass('has-success');
-	}
 };
 
 var explorer = new ECAX();
