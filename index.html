@@ -1,65 +1,61 @@
 <!DOCTYPE HTML>
 <html>
-	<head>
-		<title>Elementary Cellular Automata Explorer</title>
-		<link href="css/bootstrap.min.css" rel="stylesheet" media="screen">
-		<script src="jquery-2.1.0.js"></script>
-		<script src="jquery.mousewheel.js"></script>
-		<script src="underscore.js"></script>
-		<script src="backbone.js"></script>
-	</head>
-	<body>
-	<div class="container-fluid">
-		<div class="page-header">
-			<h1>Elementary Cellular Automata Explorer
-			<small style="float: right"><a href="https://github.com/xanxys/rule110/tree/ecax"><img src="GitHub-Mark-32px.png" width="32" height="32" alt="github"/></a></small></h1>
-		</div>
 
-		<div class="row">
-			<div class="col-md-3">
-				<div class="panel panel-default">
-					<div class="panel-heading">Rule</div>
+<head>
+    <title>Elementary Cellular Automata Explorer</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet" media="screen">
+    <script src="jquery-2.1.0.js"></script>
+    <script src="jquery.mousewheel.js"></script>
+    <script src="underscore.js"></script>
+    <script src="backbone.js"></script>
+</head>
 
-					 <div class="panel-body">
-					 	<div class="form-group">
-							<input id="ui_rule" type="text" class="form-control" value="110">
-						</div>
-					</div>
-				</div>
+<body>
+    <div class="container-fluid">
+        <div class="page-header">
+            <h1>Elementary Cellular Automata Explorer
+                <small style="float: right"><a href="https://github.com/xanxys/rule110/tree/ecax"><img
+                            src="GitHub-Mark-32px.png" width="32" height="32" alt="github" /></a></small>
+            </h1>
+        </div>
 
-				<div class="panel panel-default">
-					<div class="panel-heading">Initial State</div>
+        <div class="row">
+            <div class="col-md-3">
+                <div class="panel panel-default">
+                    <div class="panel-heading">Rule</div>
 
-					 <div class="panel-body">
-						Left Periodic Part
-						<textarea id="ui_initial_left" class="form-control" rows="1">0</textarea>
+                    <div class="panel-body">
+                        <div class="form-group">
+                            <input id="ui_rule" type="text" class="form-control" value="110">
+                        </div>
+                    </div>
+                </div>
 
-						Center Part
-						<textarea id="ui_initial_center" class="form-control" rows="1">1</textarea>
+                <div class="panel panel-default">
+                    <div class="panel-heading">Initial State</div>
 
-						Right Periodic Part
-						<textarea id="ui_initial_right" class="form-control" rows="1">0</textarea>
-					</div>
-				</div>
+                    <div class="panel-body">
+                        Left Periodic Part
+                        <textarea id="ui_initial_left" class="form-control" rows="1">0</textarea>
 
-				<!--
-				<div class="panel panel-default">
-					<div class="panel-heading">Ether</div>
-					<div id="ether">
-					</div>
-				</div>
-				-->
-			</div>
+                        Center Part
+                        <textarea id="ui_initial_center" class="form-control" rows="1">1</textarea>
 
-			<div id="col_eca" class="col-md-9">
-				<canvas id="eca" class="panel panel-default"></canvas>
-			</div>
-		</div>
-		</div>
-		<script src="serialize.js"></script>
-		<script src="eca_naive.js"></script>
-		<script src="hashcell.js"></script>
-		<script src="hashcell_view.js"></script>
-		<script src="ecax.js"></script>
-	</body>
+                        Right Periodic Part
+                        <textarea id="ui_initial_right" class="form-control" rows="1">0</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div id="col_eca" class="col-md-9">
+                <canvas id="eca" class="panel panel-default"></canvas>
+            </div>
+        </div>
+    </div>
+    <script src="eca_naive.js"></script>
+    <script src="hashcell.js"></script>
+    <script src="hashcell_view.js"></script>
+    <script src="ecax.js"></script>
+</body>
+
 </html>
