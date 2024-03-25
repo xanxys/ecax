@@ -38,82 +38,46 @@ const RuleView = Backbone.View.extend({
     initialize() { },
     modifyRule() {
         const rule = parseInt(this.$el.val());
-        // Note "==" (checking validity of integer)
         this.$el.parent().removeClass('has-error has-success');
-        if (0 <= rule && rule < 256 && rule == this.$el.val()) {
+        if (0 <= rule && rule < 256 && rule.toString() === this.$el.val()) {
             this.$el.parent().addClass('has-success');
             this.trigger('ruleChange', rule);
-            /* this.eca = new HashCell(rule);
-            this.hashcell_view.eca = this.eca; */
         } else {
             this.$el.parent().addClass('has-error');
         }
     },
 });
 
-// Create state diagram of (infinite) repetition of length n pattern.
-// The graph consists of 2^n nodes and directed links denotes
-// state transition.
-// All nodes have at least one outgoing edge.
-// Nodes with no incoming edge are Garden of Eden pattern.
-const analyze = (rule, n) => {
-    const numberToPattern = x =>
-        Array.from({ length: n }, (_, i) => ((x >> (n - i - 1)) & 1) !== 0);
 
-    const eca = new ECA(rule);
-    const graph = {};
-    for (let i = 0; i < 2 ** n; i++) {
-        const seed = numberToPattern(i);
-        const pattern = x => seed[((x % n) + n) % n];
-        eca.setInitialState(pattern);
-        const to = eca.getTile(0, 0, new Tracker(0.1))[1].slice(0, n);
-        graph[patternToString(seed)] = patternToString(to);
+class ECAX {
+    constructor() {
+        this.eca = new HashCell(110);
+        this.initial_state_view = new InitialStateView({
+            on_update: pattern => {
+                this.eca.setInitialState(pattern);
+                this.tiles = {};
+            },
+        });
+        this.hashcell_view = new HashCellView({
+            eca: this.eca,
+            debug: false,
+        });
+        this.hashcell_view.run();
+        this.initial_state_view.readValues();
+        this.rule_view = new RuleView();
+        this.rule_view.on('ruleChange', rule => {
+            this.eca = new HashCell(rule);
+            this.hashcell_view.eca = this.eca;
+        });
+        this.setupGUI();
     }
-    return graph;
-};
 
-// :: Map a b -> Map b [a]
-const transposeMap = dict => {
-    const inv_dict = {};
-    for (const key in dict) {
-        inv_dict[key] = [];
+    setupGUI() {
+        $(window).resize(_ => {
+            this.hashcell_view.$el[0].width = $('#col_eca').width();
+            this.hashcell_view.$el[0].height = $(window).height() - 150;
+        });
     }
-    for (const key in dict) {
-        inv_dict[dict[key]].push(key);
-    }
-    return inv_dict;
-};
-
-const ECAX = function () {
-    /* analyze(110, 1);
-    analyze(110, 2); */
-    const _this = this;
-    this.eca = new HashCell(110);
-    this.initial_state_view = new InitialStateView({
-        on_update(pattern) {
-            _this.eca.setInitialState(pattern);
-            _this.tiles = {};
-        },
-    });
-    this.hashcell_view = new HashCellView({
-        eca: this.eca,
-        debug: false,
-    });
-    this.hashcell_view.run();
-    this.initial_state_view.readValues();
-    this.rule_view = new RuleView();
-    this.rule_view.on('ruleChange', rule => {
-        _this.eca = new HashCell(rule);
-        _this.hashcell_view.eca = _this.eca;
-    });
-    this.setupGUI();
-};
-
-ECAX.prototype.setupGUI = function () {
-    $(window).resize(event => {
-        this.hashcell_view.$el[0].width = $('#col_eca').width();
-        this.hashcell_view.$el[0].height = $(window).height() - 150;
-    });
-};
+}
 
 const explorer = new ECAX();
