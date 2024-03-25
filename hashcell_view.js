@@ -1,3 +1,30 @@
+/**
+ * Convert number to a string with a unit, while showing at least precision digits.
+ * 123, 2 -> 123
+ * 123456, 2 -> 123k (not 0.123M)
+ * 123456, 4 -> 123.5k
+ * -123, 2 -> -123
+ * 
+ * @param {number} n number to format
+ * @param {number} precision number of digits that needs to be represented
+ * @returns 
+ */
+const toSINumber = (n, precision) => {
+    if (Math.abs(n) < 1) {
+        return n.toFixed(precision);
+    }
+
+    const units = ["", "k", "M", "G", "T", "P", "E", "Z", "Y"];
+    const sign = n > 0;
+    n = Math.abs(n);
+
+    const unit_index = Math.min(Math.floor(Math.log10(n) / 3), units.length - 1);
+    const mantissa = n / (10 ** (unit_index * 3)); // must be in [1, 1000)
+    const precAfterDot = Math.max(0, precision - Math.floor(Math.log10(mantissa)) - 1);
+
+    return `${sign ? "" : "-"}${mantissa.toFixed(precAfterDot)}${units[unit_index]}`;
+};
+
 // A window into a HashCell.
 const HashCellView = Backbone.View.extend({
     el: '#eca',
@@ -13,8 +40,6 @@ const HashCellView = Backbone.View.extend({
         // cache tile
         this.tile_size = this.eca.getTileSize();
         this.tiles = {};
-
-        this.debug = options.debug || false;
 
         // setupGUI
         // adjust canvas size
@@ -234,7 +259,7 @@ const HashCellView = Backbone.View.extend({
         ctx.fill();
 
         // Draw visible tiles
-        const tr = new Tracker(0.1);
+        const tr = new Timeout(0.1);
         ctx.save();
         ctx.translate(this.tx, this.ty);
         ctx.scale(this.zoom, this.zoom);
@@ -253,14 +278,6 @@ const HashCellView = Backbone.View.extend({
             } else {
                 ctx.fillStyle = "#020F80";
                 ctx.fillText("Calculating", 64, 64);
-            }
-
-            if (this.debug) {
-                ctx.lineWidth = 1;
-                ctx.strokeStyle = 'limegreen';
-                ctx.beginPath();
-                ctx.rect(0, 0, 256, 128);
-                ctx.stroke();
             }
             ctx.restore();
         });
@@ -286,48 +303,17 @@ const HashCellView = Backbone.View.extend({
 
         const win = this.getWindow();
         ctx.fillStyle = '#020F80';
-        ctx.fillText(
-            `${this.generateExponentWithUnit(10 * Math.pow(10, -exponent))}  x:[${win.x0.toFixed(1)},${win.x1.toFixed(1)}] t:[${win.y0.toFixed(1)},${win.y1.toFixed(1)}]`,
-            0,
-            10
-        );
+        const xrange = `x:[${toSINumber(win.x0, 4)},${toSINumber(win.x1, 4)}]`;
+        const trange = `t:[${toSINumber(win.y0, 4)},${toSINumber(win.y1, 4)}]`;
+        ctx.fillText(`${toSINumber(10 * Math.pow(10, -exponent), 1)}   ${xrange} ${trange}`, 0, 10);
         ctx.restore();
-
-        // Draw debug string.
-        if (this.debug) {
-            ctx.save();
-            ctx.translate(0, this.$el[0].height - 40);
-            ctx.beginPath();
-            ctx.rect(0, 0, 400, 20);
-            ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-            ctx.fill();
-
-            ctx.fillStyle = 'limegreen';
-            ctx.fillText(`Root Level: ${this.eca.getRoot().node.level} / Unique Tile: ${Object.keys(this.eca.cache).length} / New Id: ${this.eca.new_id}`, 0, 10);
-            ctx.restore();
-        }
 
         setTimeout(() => {
             this.redraw();
         }, 100);
     },
 
-    // 100 -> "100"
-    // 1000 -> "1k"
-    // 10000 -> "10k"
-    // ...
-    generateExponentWithUnit(n) {
-        const units = ["", "k", "M", "G", "T", "P", "E", "Z", "Y"];
 
-        for (let i = 0; i < units.length; i++) {
-            const x = n / Math.pow(1000, i);
-            if (x < 1000) {
-                return `${x}${units[i]}`;
-            }
-        }
-
-        return `${n}`;
-    },
 
     run() {
         this.redraw();

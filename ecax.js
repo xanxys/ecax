@@ -60,7 +60,6 @@ class ECAX {
         });
         this.hashcell_view = new HashCellView({
             eca: this.eca,
-            debug: false,
         });
         this.hashcell_view.run();
         this.initial_state_view.readValues();

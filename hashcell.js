@@ -1,6 +1,8 @@
-// Exponentially fast elementary automata simulation & visualization.
-
-class Tracker {
+class Timeout {
+    /**
+     * Construct timeout, count start immediately.
+     * @param {number} duration timeout duration in seconds
+     */
     constructor(duration) {
         this.timeout = duration + Date.now() / 1000;
     }
@@ -38,6 +40,15 @@ class HashCell {
         });
     }
 
+    /**
+     * @callback initialState
+     * @param {number} index
+     * @returns {boolean} cell value
+     */
+    /**
+     * 
+     * @param {initialState} initial
+     */
     setInitialState(initial) {
         this.initial = initial;
 
