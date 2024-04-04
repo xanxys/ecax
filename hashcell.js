@@ -126,6 +126,13 @@ class STRelative {
         return this._getId(lBs + 1, leftId, rightId);
     }
 
+    getBlockSize(sliceId) {
+        if (sliceId === this.sliceId0 || sliceId === this.sliceId1) {
+            return 0;
+        }
+        return STRelative._unkey(this.slicesIK.get(sliceId))[0];
+    }
+
     /**
      * 
      * @param {number} sliceId 
@@ -280,6 +287,108 @@ class STAbsolute {
     }
 }
 
+
+/**
+ * Wrapper of STAbsolute that expose rectangular tiles for easier visualization.
+ */
+class STBlocks {
+    /**
+     * @typedef block is a spatio-temporal region of cells, completely determined by curr (top edge).
+     * block consists of 2x2 sub-blocks, useful for visualization of space-time.
+     * 
+     * @property {number} id block id
+     * @property {number} bs block size
+     * 
+     * @property {boolean} l left cell state (bs == 1)
+     * @property {boolean} r right cell state (bs == 1)
+     * 
+     * @property {block} upperL (bs > 1)
+     * @property {block} upperR (bs > 1)
+     * @property {block} lowerL (bs > 1)
+     * @property {block} lowerR (bs > 1)
+     */
+
+    /**
+     * 
+     * @param {STAbsolute} st space-time
+     */
+    constructor(st) {
+        this.st = st;
+        this.strel = st.stRelative;
+    }
+
+    /**
+     * Get block whose origin is (x, t).
+     * block width: 2^bs, height: 2^(bs-1)
+     * 
+     * @param {number} x
+     * @param {number} t
+     * @param {number} bs >= 1
+     * @returns {block}
+     */
+    getBlockAt(x, t, bs) {
+        if (bs < 1) {
+            throw new Error("bs must be >= 1");
+        }
+        const slice = this.st.getSliceAt(x - 2 ** (bs - 1), t, bs + 1);  // this slice causally determines represents the block.
+        return this.getBlockById(slice);
+    }
+
+    /** 
+     * @param {number} blockId
+     * @returns {block} block with given id
+     */
+    getBlockById(blockId) {
+        const bs = this.strel.getBlockSize(blockId); // must be >= 2.
+        if (bs === 2) {
+            const lr = this.strel.getRight(this.strel.getLeft(blockId));
+            const rl = this.strel.getLeft(this.strel.getRight(blockId));
+            return {
+                id: blockId,
+                bs: bs - 1,
+                l: lr === this.st.stRelative.sliceId1,
+                r: rl === this.st.stRelative.sliceId1,
+            };
+        } else {
+            const ss = this._decompose8(blockId);
+            const upperL = this._compose4(ss[1], ss[2], ss[3], ss[4]);
+            const upperR = this._compose4(ss[3], ss[4], ss[5], ss[6]);
+
+            const midL = this.strel.getNext(this._compose4(ss[0], ss[1], ss[2], ss[3]));
+            const midC = this.strel.getNext(this._compose4(ss[2], ss[3], ss[4], ss[5]));
+            const midR = this.strel.getNext(this._compose4(ss[4], ss[5], ss[6], ss[7]));
+            const lowerL = this.strel.getComposite(midL, midC);
+            const lowerR = this.strel.getComposite(midC, midR);
+
+            return {
+                id: blockId,
+                bs: bs - 1,
+                upperL, upperR, lowerL, lowerR,
+            };
+        }
+    }
+
+    _compose4(a, b, c, d) {
+        return this.st.stRelative.getComposite(
+            this.st.stRelative.getComposite(a, b),
+            this.st.stRelative.getComposite(c, d)
+        );
+    }
+
+    _decompose8(slice) {
+        const result = [];
+        for (let i = 0; i < 8; i++) {
+            const sub0 = (i & 4) === 0 ? this.st.stRelative.getLeft(slice) : this.st.stRelative.getRight(slice);
+            const sub1 = (i & 2) === 0 ? this.st.stRelative.getLeft(sub0) : this.st.stRelative.getRight(sub0);
+            const sub2 = (i & 1) === 0 ? this.st.stRelative.getLeft(sub1) : this.st.stRelative.getRight(sub1);
+            result.push(sub2);
+        }
+        return result;
+    }
+}
+
+const sta = new STAbsolute(110);
+const stb = new STBlocks(sta);
 
 // Hashlife for ECA.
 // When traversed, the universe will look like a binary tree;
