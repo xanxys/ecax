@@ -51,23 +51,20 @@ const RuleView = Backbone.View.extend({
 
 class ECAX {
     constructor() {
-        this.eca = new HashCell(110);
         this.stb = new STBlocks(new STAbsolute(110));
         this.initial_state_view = new InitialStateView({
             on_update: pattern => {
-                this.eca.setInitialState(pattern);
+                // TODO: implement
                 this.tiles = {};
             },
         });
         this.hashcell_view = new HashCellView({
-            eca: this.eca,
             stb: this.stb,
         });
         this.hashcell_view.run();
         this.initial_state_view.readValues();
         this.rule_view = new RuleView();
         this.rule_view.on('ruleChange', rule => {
-            this.eca = new HashCell(rule);
             this.stb = new STBlocks(new STAbsolute(rule));
             this.hashcell_view.eca = this.eca;
             this.hashcell_view.stb = this.stb;
