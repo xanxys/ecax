@@ -18,19 +18,19 @@ const toSINumber = (n, precision) => {
     const sign = n > 0;
     n = Math.abs(n);
 
-    const unit_index = Math.min(Math.floor(Math.log10(n) / 3), units.length - 1);
-    const mantissa = n / (10 ** (unit_index * 3)); // must be in [1, 1000)
+    const unitIndex = Math.min(Math.floor(Math.log10(n) / 3), units.length - 1);
+    const mantissa = n / (10 ** (unitIndex * 3)); // must be in [1, 1000)
     const precAfterDot = Math.max(0, precision - Math.floor(Math.log10(mantissa)) - 1);
 
-    return `${sign ? "" : "-"}${mantissa.toFixed(precAfterDot)}${units[unit_index]}`;
+    return `${sign ? "" : "-"}${mantissa.toFixed(precAfterDot)}${units[unitIndex]}`;
 };
 
 const BLOCK_WIDTH_PX = 128;
 const BLOCK_HEIGHT_PX = 64;
 const BLOCK_MIN_BS = 7;
 
-// A window into a HashCell.
-const HashCellView = Backbone.View.extend({
+// A window into ECA spacetime.
+const ECAView = Backbone.View.extend({
     el: '#eca',
 
     initialize(options) {
@@ -56,12 +56,12 @@ const HashCellView = Backbone.View.extend({
             // p = event.offsetX,Y must be preserved.
             // p<canvas> = p<ECA> * zoom + t = p<ECA> * new_zoom + new_t
 
-            const center_x_eca = (event.offsetX - this.tx) / this.zoom;
-            const center_y_eca = (event.offsetY - this.ty) / this.zoom;
+            const centerXECA = (event.offsetX - this.tx) / this.zoom;
+            const centerYECA = (event.offsetY - this.ty) / this.zoom;
             this.zoom = Math.min(10, Math.max(1e-4, this.zoom * (1 + event.deltaY * 0.1)));
 
-            this.tx = event.offsetX - center_x_eca * this.zoom;
-            this.ty = event.offsetY - center_y_eca * this.zoom;
+            this.tx = event.offsetX - centerXECA * this.zoom;
+            this.ty = event.offsetY - centerYECA * this.zoom;
         });
 
         let dragging = false;

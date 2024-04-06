@@ -15,16 +15,16 @@ const InitialStateView = Backbone.View.extend({
         this.on_update = options.on_update;
     },
     readValues() {
-        const pat_l = patternFromString($('#ui_initial_left').val());
-        const pat_c = patternFromString($('#ui_initial_center').val());
-        const pat_r = patternFromString($('#ui_initial_right').val());
+        const patL = patternFromString($('#ui_initial_left').val());
+        const patC = patternFromString($('#ui_initial_center').val());
+        const patR = patternFromString($('#ui_initial_right').val());
         this.on_update(x => {
             if (x < 0) {
-                return pat_l[((x % pat_l.length) + pat_l.length) % pat_l.length];
-            } else if (x < pat_c.length) {
-                return pat_c[x];
+                return patL[((x % patL.length) + patL.length) % patL.length];
+            } else if (x < patC.length) {
+                return patC[x];
             } else {
-                return pat_r[(x - pat_c.length) % pat_r.length];
+                return patR[(x - patC.length) % patR.length];
             }
         });
     },
@@ -52,30 +52,30 @@ const RuleView = Backbone.View.extend({
 class ECAX {
     constructor() {
         this.stb = new STBlocks(new STAbsolute(110));
-        this.initial_state_view = new InitialStateView({
+        this.initialStateView = new InitialStateView({
             on_update: pattern => {
                 // TODO: implement
                 this.tiles = {};
             },
         });
-        this.hashcell_view = new HashCellView({
+        this.ecaView = new ECAView({
             stb: this.stb,
         });
-        this.hashcell_view.run();
-        this.initial_state_view.readValues();
-        this.rule_view = new RuleView();
-        this.rule_view.on('ruleChange', rule => {
+        this.ecaView.run();
+        this.initialStateView.readValues();
+        this.ruleView = new RuleView();
+        this.ruleView.on('ruleChange', rule => {
             this.stb = new STBlocks(new STAbsolute(rule));
-            this.hashcell_view.eca = this.eca;
-            this.hashcell_view.stb = this.stb;
+            this.ecaView.eca = this.eca;
+            this.ecaView.stb = this.stb;
         });
         this.setupGUI();
     }
 
     setupGUI() {
         $(window).resize(_ => {
-            this.hashcell_view.$el[0].width = $('#col_eca').width();
-            this.hashcell_view.$el[0].height = $(window).height() - 150;
+            this.ecaView.$el[0].width = $('#col_eca').width();
+            this.ecaView.$el[0].height = $(window).height() - 150;
         });
     }
 }
