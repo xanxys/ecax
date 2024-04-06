@@ -104,6 +104,8 @@ const HashCellView = Backbone.View.extend({
      * @returns {ImageData} image of size BLOCK_WIDTH_PX x BLOCK_HEIGHT_PX that visually represents the block
      */
     computeBlockImage(blockId) {
+        const TRUE_CELL_COL = 100;
+        const FALSE_CELL_COL = 255;
         if (this.blockImageDataCache.has(blockId)) {
             return this.blockImageDataCache.get(blockId);
         }
@@ -120,15 +122,13 @@ const HashCellView = Backbone.View.extend({
             this._writeBlockCells(cells, BLOCK_WIDTH_PX, BLOCK_HEIGHT_PX, 0, 0, blockId);
             for (let i = 0; i < cells.length; i++) {
                 if (cells.buffer[i] > 0) {
-                    // true cell: black
-                    imageData.data[i * 4 + 0] = 0;
-                    imageData.data[i * 4 + 1] = 0;
-                    imageData.data[i * 4 + 2] = 0;
+                    imageData.data[i * 4 + 0] = TRUE_CELL_COL;
+                    imageData.data[i * 4 + 1] = TRUE_CELL_COL;
+                    imageData.data[i * 4 + 2] = TRUE_CELL_COL;
                 } else {
-                    // false cell: white
-                    imageData.data[i * 4 + 0] = 255;
-                    imageData.data[i * 4 + 1] = 255;
-                    imageData.data[i * 4 + 2] = 255;
+                    imageData.data[i * 4 + 0] = FALSE_CELL_COL;
+                    imageData.data[i * 4 + 1] = FALSE_CELL_COL;
+                    imageData.data[i * 4 + 2] = FALSE_CELL_COL;
                 }
                 imageData.data[i * 4 + 3] = 255; // alpha
             }
@@ -376,8 +376,7 @@ const HashCellView = Backbone.View.extend({
 
         // TODO: draw here
         const blocks = this.getVisibleBlocks();
-        console.log(blocks.length);
-        //ctx.imageSmoothingEnabled = false;
+        ctx.imageSmoothingEnabled = this.zoom < 4;
         blocks.forEach(block => {
             ctx.drawImage(block.image, block.x0, block.y0, block.w, block.h);
         });
@@ -446,7 +445,6 @@ const HashCellView = Backbone.View.extend({
         // Select block size such that each block px results in [1, 2) px in rendered canvas.
         // When zoomed in a lot (single cell occupies multiple pixels), BLOCK_MIN_BS is used.
         const targetBs = Math.max(BLOCK_MIN_BS, 2 + Math.floor(Math.log2(BLOCK_WIDTH_PX / this.zoom)));
-        console.log("zoom", this.zoom, "log2", Math.log2(BLOCK_WIDTH_PX / this.zoom), "tbs", targetBs);
 
         const blockWidth = 2 ** targetBs;
         const blockHeight = 2 ** (targetBs - 1);
