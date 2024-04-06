@@ -43,7 +43,6 @@ class ECAView {
 
         // block cache
         this.blockImageDataCache = new Map(); // block id -> ImageData
-        this.blockImageCache = new Map(); // block id -> BitmapImage
 
         // setupGUI
         // adjust canvas size
@@ -105,7 +104,6 @@ class ECAView {
     updateSTB(stb) {
         this.stb = stb;
         this.blockImageDataCache.clear();
-        this.blockImageCache.clear();
     }
 
     /**
@@ -173,9 +171,6 @@ class ECAView {
             });
         }
         this.blockImageDataCache.set(blockId, imageData);
-        createImageBitmap(imageData).then(bitmap => {
-            this.blockImageCache.set(blockId, bitmap);
-        });
         return imageData;
     }
 
