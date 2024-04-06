@@ -4,80 +4,94 @@ const patternToString = pat => pat.map(v => v ? '1' : '0').join('');
 // "01" -> [false, true]
 const patternFromString = s => [...s].map(v => v === '1');
 
-const InitialStateView = Backbone.View.extend({
-    el: 'body',
-    events: {
-        'keyup #ui_initial_left': 'readValues',
-        'keyup #ui_initial_center': 'readValues',
-        'keyup #ui_initial_right': 'readValues',
+const ecaView = new ECAView();
+
+const app = Vue.createApp({
+    data() {
+        return {
+            ruleText: "110",
+            rule: 110,
+            ruleValid: true,
+
+            patCText: "1",
+            patC: [true],
+            patCValid: true,
+
+            patLText: "0",
+            patL: [false],
+            patLValid: true,
+
+            patRText: "0",
+            patR: [false],
+            patRValid: true
+        };
     },
-    initialize(options) {
-        this.on_update = options.on_update;
-    },
-    readValues() {
-        const patL = patternFromString($('#ui_initial_left').val());
-        const patC = patternFromString($('#ui_initial_center').val());
-        const patR = patternFromString($('#ui_initial_right').val());
-        this.on_update(x => {
-            if (x < 0) {
-                return patL[((x % patL.length) + patL.length) % patL.length];
-            } else if (x < patC.length) {
-                return patC[x];
-            } else {
-                return patR[(x - patC.length) % patR.length];
+
+    watch: {
+        ruleText(newValue) {
+            const n = parseInt(newValue);
+            this.ruleValid = (0 <= n && n < 256 && n.toString() === newValue);
+            if (this.ruleValid) {
+                this.rule = n;
             }
-        });
+        },
+
+        patCText(newValue) {
+            try {
+                const pat = patternFromString(newValue);
+                this.patCValid = (pat.length >= 1 && patternToString(pat) === newValue);
+                if (this.patCValid) {
+                    this.patC = pat;
+                }
+            } catch {
+                this.patCValid = false;
+            }
+        },
+
+        patLText(newValue) {
+            try {
+                const pat = patternFromString(newValue);
+                this.patLValid = (pat.length >= 1 && patternToString(pat) === newValue);
+                if (this.patLValid) {
+                    this.patL = pat;
+                }
+            } catch {
+                this.patLValid = false;
+            }
+        },
+
+        patRText(newValue) {
+            try {
+                const pat = patternFromString(newValue);
+                this.patRValid = (pat.length >= 1 && patternToString(pat) === newValue);
+                if (this.patRValid) {
+                    this.patR = pat;
+                }
+            } catch {
+                this.patRValid = false;
+            }
+        },
+
+        rule(newValue) {
+            ecaView.updateSTB(new STBlocks(new STAbsolute(newValue, this.patC, this.patL, this.patR)));
+        },
+
+        patC(newValue) {
+            ecaView.updateSTB(new STBlocks(new STAbsolute(this.rule, newValue, this.patL, this.patR)));
+        },
+
+        patL(newValue) {
+            ecaView.updateSTB(new STBlocks(new STAbsolute(this.rule, this.patC, newValue, this.patR)));
+        },
+
+        patR(newValue) {
+            ecaView.updateSTB(new STBlocks(new STAbsolute(this.rule, this.patC, this.patL, newValue)));
+        },
     },
+
+    mounted() {
+        ecaView.updateSTB(new STBlocks(new STAbsolute(this.rule, this.patC, this.patL, this.patR)));
+    }
 });
 
-const RuleView = Backbone.View.extend({
-    el: '#ui_rule',
-    events: {
-        keyup: 'modifyRule',
-    },
-    initialize() { },
-    modifyRule() {
-        const rule = parseInt(this.$el.val());
-        this.$el.parent().removeClass('has-error has-success');
-        if (0 <= rule && rule < 256 && rule.toString() === this.$el.val()) {
-            this.$el.parent().addClass('has-success');
-            this.trigger('ruleChange', rule);
-        } else {
-            this.$el.parent().addClass('has-error');
-        }
-    },
-});
-
-
-class ECAX {
-    constructor() {
-        this.stb = new STBlocks(new STAbsolute(110));
-        this.initialStateView = new InitialStateView({
-            on_update: pattern => {
-                // TODO: implement
-                this.tiles = {};
-            },
-        });
-        this.ecaView = new ECAView({
-            stb: this.stb,
-        });
-        this.ecaView.run();
-        this.initialStateView.readValues();
-        this.ruleView = new RuleView();
-        this.ruleView.on('ruleChange', rule => {
-            this.stb = new STBlocks(new STAbsolute(rule));
-            this.ecaView.eca = this.eca;
-            this.ecaView.stb = this.stb;
-        });
-        this.setupGUI();
-    }
-
-    setupGUI() {
-        $(window).resize(_ => {
-            this.ecaView.$el[0].width = $('#col_eca').width();
-            this.ecaView.$el[0].height = $(window).height() - 150;
-        });
-    }
-}
-
-const explorer = new ECAX();
+app.mount("#app");

@@ -6,8 +6,7 @@
     <link href="css/bootstrap.min.css" rel="stylesheet" media="screen">
     <script src="jquery-3.7.1.min.js"></script>
     <script src="jquery.mousewheel.js"></script>
-    <script src="underscore-umd-min.js"></script>
-    <script src="backbone-min.js"></script>
+    <script src="vue.global.min.js"></script>
 </head>
 
 <body>
@@ -20,13 +19,13 @@
         </div>
 
         <div class="row">
-            <div class="col-md-3">
+            <div class="col-md-3" id="app">
                 <div class="panel panel-default">
                     <div class="panel-heading">Rule</div>
 
                     <div class="panel-body">
-                        <div class="form-group">
-                            <input id="ui_rule" type="text" class="form-control" value="110">
+                        <div class="form-group" :class="{'has-success': ruleValid, 'has-error': !ruleValid}">
+                            <input id="ui_rule" type="text" class="form-control" v-model="ruleText">
                         </div>
                     </div>
                 </div>
@@ -36,13 +35,20 @@
 
                     <div class="panel-body">
                         Left Periodic Part
-                        <textarea id="ui_initial_left" class="form-control" rows="1">0</textarea>
+                        <div class="form-group" :class="{'has-success': patLValid, 'has-error': !patLValid}">
+                            <textarea id="ui_initial_left" class="form-control" rows="1" v-model="patLText"></textarea>
+                        </div>
 
                         Center Part
-                        <textarea id="ui_initial_center" class="form-control" rows="1">1</textarea>
+                        <div class="form-group" :class="{'has-success': patCValid, 'has-error': !patCValid}">
+                            <textarea id="ui_initial_center" class="form-control" rows="1"
+                                v-model="patCText"></textarea>
+                        </div>
 
                         Right Periodic Part
-                        <textarea id="ui_initial_right" class="form-control" rows="1">0</textarea>
+                        <div class="form-group" :class="{'has-success': patRValid, 'has-error': !patRValid}">
+                            <textarea id="ui_initial_right" class="form-control" rows="1" v-model="patRText"></textarea>
+                        </div>
                     </div>
                 </div>
             </div>

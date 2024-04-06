@@ -30,11 +30,10 @@ const BLOCK_HEIGHT_PX = 64;
 const BLOCK_MIN_BS = 7;
 
 // A window into ECA spacetime.
-const ECAView = Backbone.View.extend({
-    el: '#eca',
-
-    initialize(options) {
-        this.stb = options.stb;
+class ECAView {
+    constructor() {
+        this.$el = $("#eca");
+        this.stb = null;
 
         // p<canvas> = p<ECA> * zoom + t
         this.zoom = 3;
@@ -65,19 +64,19 @@ const ECAView = Backbone.View.extend({
         });
 
         let dragging = false;
-        let prev_ev = null;
+        let prevEv = null;
         this.$el.on('mousedown', () => {
             dragging = true;
         });
 
         this.$el.on('mouseleave', () => {
             dragging = false;
-            prev_ev = null;
+            prevEv = null;
         });
 
         this.$el.on('mouseup', () => {
             dragging = false;
-            prev_ev = null;
+            prevEv = null;
         });
 
         this.$el.on('mousemove', event => {
@@ -85,20 +84,29 @@ const ECAView = Backbone.View.extend({
                 return;
             }
 
-            if (prev_ev !== null) {
-                this.tx += event.clientX - prev_ev.clientX;
-                this.ty += event.clientY - prev_ev.clientY;
+            if (prevEv !== null) {
+                this.tx += event.clientX - prevEv.clientX;
+                this.ty += event.clientY - prevEv.clientY;
             }
-            prev_ev = event;
+            prevEv = event;
         });
-    },
+
+        this._run();
+    }
+
+    /** Sets new STBlocks */
+    updateSTB(stb) {
+        this.stb = stb;
+        this.blockImageDataCache.clear();
+        this.blockImageCache.clear();
+    }
 
     /**
      * 
      * @param {number} blockId 
      * @returns {ImageData} image of size BLOCK_WIDTH_PX x BLOCK_HEIGHT_PX that visually represents the block
      */
-    computeBlockImage(blockId, timeout) {
+    _computeBlockImage(blockId, timeout) {
         const TRUE_CELL_COL = 100;
         const FALSE_CELL_COL = 255;
         if (this.blockImageDataCache.has(blockId)) {
@@ -129,10 +137,10 @@ const ECAView = Backbone.View.extend({
             }
         } else {
             // downscale and combine sub-blocks
-            const imageUpperL = this.computeBlockImage(block.upperL, timeout);
-            const imageUpperR = this.computeBlockImage(block.upperR, timeout);
-            const imageLowerL = this.computeBlockImage(block.lowerL, timeout);
-            const imageLowerR = this.computeBlockImage(block.lowerR, timeout);
+            const imageUpperL = this._computeBlockImage(block.upperL, timeout);
+            const imageUpperR = this._computeBlockImage(block.upperR, timeout);
+            const imageLowerL = this._computeBlockImage(block.lowerL, timeout);
+            const imageLowerR = this._computeBlockImage(block.lowerR, timeout);
 
             const hw = BLOCK_WIDTH_PX / 2;
             const hh = BLOCK_HEIGHT_PX / 2;
@@ -162,7 +170,7 @@ const ECAView = Backbone.View.extend({
             this.blockImageCache.set(blockId, bitmap);
         });
         return imageData;
-    },
+    }
 
     /**
      * Write cells of a block to a specified rectangular region of an array.
@@ -192,13 +200,16 @@ const ECAView = Backbone.View.extend({
             this._writeBlockCells(array, width, height, xofs + 0, yofs + halfHeight, block.lowerL);
             this._writeBlockCells(array, width, height, xofs + halfWidth, yofs + halfHeight, block.lowerR);
         }
-    },
-
-    notifyUpdate() {
-        this.tiles = {};
-    },
+    }
 
     redraw() {
+        if (this.stb === null) {
+            setTimeout(() => {
+                this.redraw();
+            }, 100);
+            return;
+        }
+
         const ctx = this.$el[0].getContext('2d');
 
         ctx.fillStyle = 'white';
@@ -237,7 +248,7 @@ const ECAView = Backbone.View.extend({
         ctx.strokeStyle = '#020F80';
         ctx.stroke();
 
-        const win = this.getWindow();
+        const win = this._getWindow();
         ctx.fillStyle = '#020F80';
         const xrange = `x:[${toSINumber(win.x0, 4)},${toSINumber(win.x1, 4)}]`;
         const trange = `t:[${toSINumber(win.y0, 4)},${toSINumber(win.y1, 4)}]`;
@@ -247,11 +258,11 @@ const ECAView = Backbone.View.extend({
         setTimeout(() => {
             this.redraw();
         }, 100);
-    },
+    }
 
-    run() {
+    _run() {
         this.redraw();
-    },
+    }
 
     /**
      * @returns {object[]} [{x0: number, y0: number, w: number, h: number, image: ImageData}]
@@ -264,7 +275,7 @@ const ECAView = Backbone.View.extend({
         const blockWidth = 2 ** targetBs;
         const blockHeight = 2 ** (targetBs - 1);
 
-        const win = this.getWindow();
+        const win = this._getWindow();
         const ix0 = Math.floor(win.x0 / blockWidth); // inclusive
         const ix1 = Math.ceil(win.x1 / blockWidth); // non-inclusive
         const iy0 = Math.max(0, Math.floor(win.y0 / blockHeight)); // inclusive
@@ -276,7 +287,7 @@ const ECAView = Backbone.View.extend({
             for (let iy = iy0; iy < iy1; iy++) {
                 for (let ix = ix0; ix < ix1; ix++) {
                     const blockId = this.stb.getBlockAt(ix * blockWidth, iy * blockHeight, targetBs).id;
-                    this.computeBlockImage(blockId, timeout);
+                    this._computeBlockImage(blockId, timeout);
                     const image = this.blockImageCache.get(blockId);
                     if (image !== undefined) {
                         result.push({
@@ -297,13 +308,13 @@ const ECAView = Backbone.View.extend({
             }
         }
         return result;
-    },
+    }
 
     /**
      * Get current visible area of ECA, in ECA coordinates (x, t == y).
      * @returns {object} {x0, x1, y0, y1}
      */
-    getWindow() {
+    _getWindow() {
         // p<canvas> = p<ECA> * zoom + t
         // p<ECA> = (p<canvas> - t) / zoom
         return {
@@ -312,5 +323,5 @@ const ECAView = Backbone.View.extend({
             y0: Math.max(0, (-this.ty) / this.zoom),
             y1: (this.$el[0].height - this.ty) / this.zoom,
         };
-    },
-});
+    }
+}
