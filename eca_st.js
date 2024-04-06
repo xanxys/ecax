@@ -247,7 +247,6 @@ class STAbsolute {
         this.initLCyc = initLCyc || [false];
         this.initRCyc = initRCyc || [false];
 
-        // this.initSlices = new Map(); // key (format: ???) -> slice id
         this.sliceCache = new Map(); // key (format: "x:t:bs") -> slice id
     }
 
@@ -265,7 +264,7 @@ class STAbsolute {
             throw new Error("t must be >= 0");
         }
 
-        const key = `${x}:${t}:${bs}`;
+        const key = this._key(x, t, bs);
         const slice = this.sliceCache.get(key);
         if (slice !== undefined) {
             return slice;
@@ -275,39 +274,67 @@ class STAbsolute {
             timeout.checkTime();
         }
 
-        // TODO:
-        // This code works, but inefficient.
-        // current code eventually evaluates all cells individually at t=0.
-        // by handling t == 0 & bs > 0 case specially by using modulo, it can be exponentially fast.
+        // Basic computation strategy: reduce to slices at t == 0 (which is given by initial condition).
         let result;
         if (bs === 0) {
             if (t === 0) {
-                const n = this.initC.length;
-                let v;
-                if (x < 0) {
-                    const k = this.initLCyc.length;
-                    v = ((x % k) + k) % k;
-                } else if (x < n) {
-                    v = this.initC[x];
-                } else {
-                    const k = this.initRCyc.length;
-                    v = this.initRCyc[(x - n) % k];
-                }
-                result = this.stRelative.getPrimitive(v);
+                result = this.stRelative.getPrimitive(this._getInitCellAt(x));
             } else {
+                // to go up in time, make slice bigger by chosing arbitrary parent.
                 result = this.stRelative.getLeft(this.getSliceAt(x, t, 1));
             }
         } else {
             const d = 2 ** (bs - 1);
             if (t - d >= 0) {
+                // Compute target by first computing "parent" slie and get its "next".
                 result = this.stRelative.getNext(this.getSliceAt(x - d, t - d, bs + 1, timeout), timeout);
             } else {
-                // overshoots: divide and continue
+                // If "parent" exists in t < 0, divide in half (thus making parents closer in time) and compute them recursively.
                 result = this.stRelative.getComposite(this.getSliceAt(x, t, bs - 1, timeout), this.getSliceAt(x + d, t, bs - 1, timeout));
             }
         }
         this.sliceCache.set(key, result);
         return result;
+    }
+
+    _getInitCellAt(x) {
+        const n = this.initC.length;
+        if (x < 0) {
+            const k = this.initLCyc.length;
+            return this.initLCyc[((x % k) + k) % k];
+        } else if (x < n) {
+            return this.initC[x];
+        } else {
+            const k = this.initRCyc.length;
+            return this.initRCyc[(x - n) % k];
+        }
+    }
+
+    /**
+     * Returns cache key for getSliceAt(x, t, bs).
+     * @param {number} x 
+     * @param {number} t 
+     * @param {number} bs
+     * @returns {string} cache key 
+     */
+    _key(x, t, bs) {
+        // use cyclicity to re-use cache if possible.
+        if (t === 0) {
+            const width = 2 ** bs;
+            const x0 = x;
+            const x1 = x + width; // exclusive
+
+            if (x1 <= 0) {
+                // slice is in completely left-periodic region.
+                x = (x1 % this.initLCyc.length) - width;
+            } else if (x0 >= this.initC.length) {
+                // slice is in completely right-periodic region.
+                x = (x - this.initC.length) % this.initRCyc.length + this.initC.length;
+            }
+        }
+
+        // generic fallback
+        return `${x}:${t}:${bs}`;
     }
 }
 

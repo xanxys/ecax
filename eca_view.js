@@ -63,7 +63,7 @@ class ECAView {
 
             const centerXECA = (event.offsetX - this.tx) / this.zoom;
             const centerYECA = (event.offsetY - this.ty) / this.zoom;
-            this.zoom = Math.min(10, Math.max(1e-4, this.zoom * (1 + event.deltaY * 0.1)));
+            this.zoom = Math.min(10, Math.max(1e-8, this.zoom * (1 + event.deltaY * 0.1)));
 
             this.tx = event.offsetX - centerXECA * this.zoom;
             this.ty = event.offsetY - centerYECA * this.zoom;
