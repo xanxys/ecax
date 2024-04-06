@@ -25,17 +25,26 @@ const toSINumber = (n, precision) => {
     return `${sign ? "" : "-"}${mantissa.toFixed(precAfterDot)}${units[unit_index]}`;
 };
 
+const BLOCK_WIDTH_PX = 128;
+const BLOCK_HEIGHT_PX = 64;
+const BLOCK_MIN_BS = 7;
+
 // A window into a HashCell.
 const HashCellView = Backbone.View.extend({
     el: '#eca',
 
     initialize(options) {
         this.eca = options.eca;
+        this.stb = options.stb;
 
         // p<canvas> = p<ECA> * zoom + t
         this.zoom = 3;
         this.tx = $('#col_eca').width() / 2;
         this.ty = 0;
+
+        // block cache
+        this.blockImageDataCache = new Map(); // block id -> ImageData
+        this.blockImageCache = new Map(); // block id -> BitmapImage
 
         // cache tile
         this.tile_size = this.eca.getTileSize();
@@ -87,6 +96,107 @@ const HashCellView = Backbone.View.extend({
             }
             prev_ev = event;
         });
+    },
+
+    /**
+     * 
+     * @param {number} blockId 
+     * @returns {ImageData} image of size BLOCK_WIDTH_PX x BLOCK_HEIGHT_PX that visually represents the block
+     */
+    computeBlockImage(blockId) {
+        if (this.blockImageDataCache.has(blockId)) {
+            return this.blockImageDataCache.get(blockId);
+        }
+
+        const block = this.stb.getBlockById(blockId);
+        if (block.bs < BLOCK_MIN_BS) {
+            throw new Error("Block size is too small to render");
+        }
+
+        const imageData = new ImageData(BLOCK_WIDTH_PX, BLOCK_HEIGHT_PX);
+        if (block.bs === BLOCK_MIN_BS) {
+            // fill pixel-by-pixel
+            const cells = new Uint8Array(BLOCK_WIDTH_PX * BLOCK_HEIGHT_PX);
+            this._writeBlockCells(cells, BLOCK_WIDTH_PX, BLOCK_HEIGHT_PX, 0, 0, blockId);
+            for (let i = 0; i < cells.length; i++) {
+                if (cells.buffer[i] > 0) {
+                    // true cell: black
+                    imageData.data[i * 4 + 0] = 0;
+                    imageData.data[i * 4 + 1] = 0;
+                    imageData.data[i * 4 + 2] = 0;
+                } else {
+                    // false cell: white
+                    imageData.data[i * 4 + 0] = 255;
+                    imageData.data[i * 4 + 1] = 255;
+                    imageData.data[i * 4 + 2] = 255;
+                }
+                imageData.data[i * 4 + 3] = 255; // alpha
+            }
+        } else {
+            // downscale and combine sub-blocks
+            const imageUpperL = this.computeBlockImage(block.upperL);
+            const imageUpperR = this.computeBlockImage(block.upperR);
+            const imageLowerL = this.computeBlockImage(block.lowerL);
+            const imageLowerR = this.computeBlockImage(block.lowerR);
+
+            const hw = BLOCK_WIDTH_PX / 2;
+            const hh = BLOCK_HEIGHT_PX / 2;
+
+            const parts = [
+                { x0: 0, y0: 0, image: imageUpperL },
+                { x0: hw, y0: 0, image: imageUpperR },
+                { x0: 0, y0: hh, image: imageLowerL },
+                { x0: hw, y0: hh, image: imageLowerR },
+            ];
+            parts.forEach(part => {
+                for (let y = 0; y < hh; y++) {
+                    for (let x = 0; x < hw; x++) {
+                        for (let c = 0; c < 4; c++) {
+                            const v00 = part.image.data[((x * 2 + 0) + BLOCK_WIDTH_PX * (y * 2 + 0)) * 4 + c];
+                            const v10 = part.image.data[((x * 2 + 1) + BLOCK_WIDTH_PX * (y * 2 + 0)) * 4 + c];
+                            const v01 = part.image.data[((x * 2 + 0) + BLOCK_WIDTH_PX * (y * 2 + 1)) * 4 + c];
+                            const v11 = part.image.data[((x * 2 + 1) + BLOCK_WIDTH_PX * (y * 2 + 1)) * 4 + c];
+                            imageData.data[((part.x0 + x) + BLOCK_WIDTH_PX * (part.y0 + y)) * 4 + c] = Math.floor((v00 + v10 + v01 + v11) / 4);
+                        }
+                    }
+                }
+            });
+        }
+        this.blockImageDataCache.set(blockId, imageData);
+        createImageBitmap(imageData).then(bitmap => {
+            this.blockImageCache.set(blockId, bitmap);
+        });
+        return imageData;
+    },
+
+    /**
+     * Write cells of a block to a specified rectangular region of an array.
+     * 
+     * @param {array} Uint8Array (0: false, 255: true)
+     * @param {number} width width of array
+     * @param {number} height height of array
+     * @param {number} xofs x offset in array
+     * @param {number} yofs y offset in array
+     * @param {number} blockId 
+     * 
+     * array format
+     * 0, 1, 2,..., W-1
+     * W, W+1, ...
+     */
+    _writeBlockCells(array, width, height, xofs, yofs, blockId) {
+        const block = this.stb.getBlockById(blockId);
+        if (block.bs === 1) {
+            const ofs = xofs + width * yofs;
+            array.buffer[ofs + 0] = block.l ? 255 : 0;
+            array.buffer[ofs + 1] = block.r ? 255 : 0;
+        } else {
+            const halfWidth = 2 ** (block.bs - 1);
+            const halfHeight = 2 ** (block.bs - 2);
+            this._writeBlockCells(array, width, height, xofs + 0, yofs + 0, block.upperL);
+            this._writeBlockCells(array, width, height, xofs + halfWidth, yofs + 0, block.upperR);
+            this._writeBlockCells(array, width, height, xofs + 0, yofs + halfHeight, block.lowerL);
+            this._writeBlockCells(array, width, height, xofs + halfWidth, yofs + halfHeight, block.lowerR);
+        }
     },
 
     notifyUpdate() {
@@ -264,6 +374,15 @@ const HashCellView = Backbone.View.extend({
         ctx.translate(this.tx, this.ty);
         ctx.scale(this.zoom, this.zoom);
 
+        // TODO: draw here
+        const blocks = this.getVisibleBlocks();
+        console.log(blocks.length);
+        //ctx.imageSmoothingEnabled = false;
+        blocks.forEach(block => {
+            ctx.drawImage(block.image, block.x0, block.y0, block.w, block.h);
+        });
+
+        /*
         const node_descs = this.getVisibleNodes(tr);
         node_descs.forEach(node_desc => {
             const attachment = this.getAttachment(node_desc.node, tr);
@@ -281,6 +400,7 @@ const HashCellView = Backbone.View.extend({
             }
             ctx.restore();
         });
+        */
         ctx.restore();
 
         // Draw ruler (10x10 - 10x100)
@@ -317,6 +437,44 @@ const HashCellView = Backbone.View.extend({
 
     run() {
         this.redraw();
+    },
+
+    /**
+     * @returns {object[]} [{x0: number, y0: number, w: number, h: number, image: ImageData}]
+     */
+    getVisibleBlocks() {
+        // Select block size such that each block px results in [1, 2) px in rendered canvas.
+        // When zoomed in a lot (single cell occupies multiple pixels), BLOCK_MIN_BS is used.
+        const targetBs = Math.max(BLOCK_MIN_BS, 2 + Math.floor(Math.log2(BLOCK_WIDTH_PX / this.zoom)));
+        console.log("zoom", this.zoom, "log2", Math.log2(BLOCK_WIDTH_PX / this.zoom), "tbs", targetBs);
+
+        const blockWidth = 2 ** targetBs;
+        const blockHeight = 2 ** (targetBs - 1);
+
+        const win = this.getWindow();
+        const ix0 = Math.floor(win.x0 / blockWidth); // inclusive
+        const ix1 = Math.ceil(win.x1 / blockWidth); // non-inclusive
+        const iy0 = Math.max(0, Math.floor(win.y0 / blockHeight)); // inclusive
+        const iy1 = Math.max(0, Math.ceil(win.y1 / blockHeight)); // non-inclusive
+
+        const result = [];
+        for (let iy = iy0; iy < iy1; iy++) {
+            for (let ix = ix0; ix < ix1; ix++) {
+                const blockId = this.stb.getBlockAt(ix * blockWidth, iy * blockHeight, targetBs).id;
+                this.computeBlockImage(blockId);
+                const image = this.blockImageCache.get(blockId);
+                if (image !== undefined) {
+                    result.push({
+                        x0: ix * blockWidth,
+                        y0: iy * blockHeight,
+                        w: blockWidth,
+                        h: blockHeight,
+                        image: image
+                    });
+                }
+            }
+        }
+        return result;
     },
 
     //return [{node:HashCellNode, dx, dy, width}]
@@ -382,6 +540,10 @@ const HashCellView = Backbone.View.extend({
         return indices;
     },
 
+    /**
+     * Get current visible area of ECA, in ECA coordinates (x, t == y).
+     * @returns {object} {x0, x1, y0, y1}
+     */
     getWindow() {
         // p<canvas> = p<ECA> * zoom + t
         // p<ECA> = (p<canvas> - t) / zoom

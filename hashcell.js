@@ -387,8 +387,7 @@ class STBlocks {
     }
 }
 
-const sta = new STAbsolute(110);
-const stb = new STBlocks(sta);
+
 
 // Hashlife for ECA.
 // When traversed, the universe will look like a binary tree;
