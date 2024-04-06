@@ -7,10 +7,15 @@ class Timeout {
         this.timeout = duration + Date.now() / 1000;
     }
 
-    shouldRun() {
+    checkTime() {
         const t = Date.now() / 1000;
-        return t < this.timeout;
+        if (t >= this.timeout) {
+            throw new TimeoutError();
+        }
     }
+}
+
+class TimeoutError {
 }
 
 
@@ -44,16 +49,16 @@ class STRelative {
         this.nexts = new Map(); // "curr" slice id -> "next" slice id
     }
 
-    // TODO: needs stopper (this can explode for random ECA)
     /**
      * Get "next" slice of the tile with given "curr".
      * curr must contains 4 or more cells.
      * next is half width of curr, and curr_size / 4 steps ahead of curr.
      * 
      * @param {number} curr "curr" slice id
+     * @param {Timeout} timeout timeout checker. throws TimeoutError when time is up.
      * @returns {number} "next" slice id
      */
-    getNext(currId) {
+    getNext(currId, timeout) {
         if (this.nexts.has(currId)) {
             return this.nexts.get(currId);
         }
@@ -63,6 +68,10 @@ class STRelative {
         const currKey = this.slicesIK.get(currId);
         if (currKey === undefined) {
             throw new Error(`Unknown slice ${currId}`);
+        }
+
+        if (timeout !== undefined) {
+            timeout.checkTime();
         }
 
         const [currBs, currLId, currRId] = STRelative._unkey(currKey);
@@ -242,16 +251,16 @@ class STAbsolute {
         this.sliceCache = new Map(); // key (format: "x:t:bs") -> slice id
     }
 
-    // TODO: needs stopper (this can explode for random ECA)
     /**
      * Get slice corresponding to [x, x + 2^bs - 1] at t.
      * 
      * @param {number} x
      * @param {number} t
      * @param {number} bs
+     * @param {Timeout} timeout timeout checker. throws TimeoutError when time is up.
      * @returns {number} slice id
      */
-    getSliceAt(x, t, bs) {
+    getSliceAt(x, t, bs, timeout) {
         if (t < 0) {
             throw new Error("t must be >= 0");
         }
@@ -260,6 +269,10 @@ class STAbsolute {
         const slice = this.sliceCache.get(key);
         if (slice !== undefined) {
             return slice;
+        }
+
+        if (timeout !== undefined) {
+            timeout.checkTime();
         }
 
         // TODO:
@@ -287,10 +300,10 @@ class STAbsolute {
         } else {
             const d = 2 ** (bs - 1);
             if (t - d >= 0) {
-                result = this.stRelative.getNext(this.getSliceAt(x - d, t - d, bs + 1));
+                result = this.stRelative.getNext(this.getSliceAt(x - d, t - d, bs + 1, timeout), timeout);
             } else {
                 // overshoots: divide and continue
-                result = this.stRelative.getComposite(this.getSliceAt(x, t, bs - 1), this.getSliceAt(x + d, t, bs - 1));
+                result = this.stRelative.getComposite(this.getSliceAt(x, t, bs - 1, timeout), this.getSliceAt(x + d, t, bs - 1, timeout));
             }
         }
         this.sliceCache.set(key, result);
@@ -335,21 +348,23 @@ class STBlocks {
      * @param {number} x
      * @param {number} t
      * @param {number} bs >= 1
+     * @param {Timeout} timeout timeout checker. throws TimeoutError when time is up.
      * @returns {block}
      */
-    getBlockAt(x, t, bs) {
+    getBlockAt(x, t, bs, timeout) {
         if (bs < 1) {
             throw new Error("bs must be >= 1");
         }
-        const slice = this.st.getSliceAt(x - 2 ** (bs - 1), t, bs + 1);  // this slice causally determines represents the block.
-        return this.getBlockById(slice);
+        const slice = this.st.getSliceAt(x - 2 ** (bs - 1), t, bs + 1, timeout);  // this slice causally determines represents the block.
+        return this.getBlockById(slice, timeout);
     }
 
     /** 
      * @param {number} blockId
+     * @param {Timeout} timeout timeout checker. throws TimeoutError when time is up.
      * @returns {block} block with given id
      */
-    getBlockById(blockId) {
+    getBlockById(blockId, timeout) {
         const bs = this.strel.getBlockSize(blockId); // must be >= 2.
         if (bs === 2) {
             const lr = this.strel.getRight(this.strel.getLeft(blockId));
@@ -365,9 +380,9 @@ class STBlocks {
             const upperL = this._compose4(ss[1], ss[2], ss[3], ss[4]);
             const upperR = this._compose4(ss[3], ss[4], ss[5], ss[6]);
 
-            const midL = this.strel.getNext(this._compose4(ss[0], ss[1], ss[2], ss[3]));
-            const midC = this.strel.getNext(this._compose4(ss[2], ss[3], ss[4], ss[5]));
-            const midR = this.strel.getNext(this._compose4(ss[4], ss[5], ss[6], ss[7]));
+            const midL = this.strel.getNext(this._compose4(ss[0], ss[1], ss[2], ss[3]), timeout);
+            const midC = this.strel.getNext(this._compose4(ss[2], ss[3], ss[4], ss[5]), timeout);
+            const midR = this.strel.getNext(this._compose4(ss[4], ss[5], ss[6], ss[7]), timeout);
             const lowerL = this.strel.getComposite(midL, midC);
             const lowerR = this.strel.getComposite(midC, midR);
 

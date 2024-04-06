@@ -98,14 +98,14 @@ const HashCellView = Backbone.View.extend({
      * @param {number} blockId 
      * @returns {ImageData} image of size BLOCK_WIDTH_PX x BLOCK_HEIGHT_PX that visually represents the block
      */
-    computeBlockImage(blockId) {
+    computeBlockImage(blockId, timeout) {
         const TRUE_CELL_COL = 100;
         const FALSE_CELL_COL = 255;
         if (this.blockImageDataCache.has(blockId)) {
             return this.blockImageDataCache.get(blockId);
         }
 
-        const block = this.stb.getBlockById(blockId);
+        const block = this.stb.getBlockById(blockId, timeout);
         if (block.bs < BLOCK_MIN_BS) {
             throw new Error("Block size is too small to render");
         }
@@ -129,10 +129,10 @@ const HashCellView = Backbone.View.extend({
             }
         } else {
             // downscale and combine sub-blocks
-            const imageUpperL = this.computeBlockImage(block.upperL);
-            const imageUpperR = this.computeBlockImage(block.upperR);
-            const imageLowerL = this.computeBlockImage(block.lowerL);
-            const imageLowerR = this.computeBlockImage(block.lowerR);
+            const imageUpperL = this.computeBlockImage(block.upperL, timeout);
+            const imageUpperR = this.computeBlockImage(block.upperR, timeout);
+            const imageLowerL = this.computeBlockImage(block.lowerL, timeout);
+            const imageLowerR = this.computeBlockImage(block.lowerR, timeout);
 
             const hw = BLOCK_WIDTH_PX / 2;
             const hh = BLOCK_HEIGHT_PX / 2;
@@ -271,20 +271,29 @@ const HashCellView = Backbone.View.extend({
         const iy1 = Math.max(0, Math.ceil(win.y1 / blockHeight)); // non-inclusive
 
         const result = [];
-        for (let iy = iy0; iy < iy1; iy++) {
-            for (let ix = ix0; ix < ix1; ix++) {
-                const blockId = this.stb.getBlockAt(ix * blockWidth, iy * blockHeight, targetBs).id;
-                this.computeBlockImage(blockId);
-                const image = this.blockImageCache.get(blockId);
-                if (image !== undefined) {
-                    result.push({
-                        x0: ix * blockWidth,
-                        y0: iy * blockHeight,
-                        w: blockWidth,
-                        h: blockHeight,
-                        image: image
-                    });
+        const timeout = new Timeout(0.05);
+        try {
+            for (let iy = iy0; iy < iy1; iy++) {
+                for (let ix = ix0; ix < ix1; ix++) {
+                    const blockId = this.stb.getBlockAt(ix * blockWidth, iy * blockHeight, targetBs).id;
+                    this.computeBlockImage(blockId, timeout);
+                    const image = this.blockImageCache.get(blockId);
+                    if (image !== undefined) {
+                        result.push({
+                            x0: ix * blockWidth,
+                            y0: iy * blockHeight,
+                            w: blockWidth,
+                            h: blockHeight,
+                            image: image
+                        });
+                    }
                 }
+            }
+        } catch (e) {
+            if (e instanceof TimeoutError) {
+                // do nothing
+            } else {
+                throw e;
             }
         }
         return result;
