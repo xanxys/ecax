@@ -54,6 +54,9 @@ class STRelative {
      * @returns {number} "next" slice id
      */
     getNext(currId) {
+        if (this.nexts.has(currId)) {
+            return this.nexts.get(currId);
+        }
         if (currId === this.sliceId0 || currId === this.sliceId1) {
             throw new Error("curr must contains 4 cells or more.");
         }
@@ -67,6 +70,7 @@ class STRelative {
         const currRKey = this.slicesIK.get(currRId);
         const [, llId, lrId] = STRelative._unkey(currLKey);
         const [, rlId, rrId] = STRelative._unkey(currRKey);
+        let next;
         if (currBs === 2) {
             // primitive: 2 rule applications
             const ll = llId === this.sliceId1;
@@ -76,7 +80,7 @@ class STRelative {
 
             const nextLId = this._step(ll, lr, rl) ? this.sliceId1 : this.sliceId0;
             const nextRId = this._step(lr, rl, rr) ? this.sliceId1 : this.sliceId0;
-            return this._getId(currBs - 1, nextLId, nextRId);
+            next = this._getId(currBs - 1, nextLId, nextRId);
         } else {
             // composite: 3 half-steps + 2 half-steps
             const mL = this.getNext(currLId);
@@ -85,8 +89,10 @@ class STRelative {
 
             const nL = this.getNext(this._getId(currBs - 1, mL, mC));
             const nR = this.getNext(this._getId(currBs - 1, mC, mR));
-            return this._getId(currBs - 1, nL, nR);
+            next = this._getId(currBs - 1, nL, nR);
         }
+        this.nexts.set(currId, next);
+        return next;
     }
 
     /**
@@ -162,7 +168,8 @@ class STRelative {
      * @returns {string} key
      */
     static _key(bs, lid, rid) {
-        return `${bs}:${lid}:${rid}`;
+        // 10b, 20b, 20b
+        return ((bs * 1024 * 1024 * 1024 * 1024) + (lid * 1024 * 1024) + rid); // use *, because << is limited to 32 bit
     }
 
     /**
@@ -171,7 +178,8 @@ class STRelative {
      * @returns {[number, number, number]} [bs, lid, rid]
      */
     static _unkey(key) {
-        return key.split(":").map(v => parseInt(v));
+        const v = key;
+        return [Math.floor(v / (1024 * 1024 * 1024 * 1024)), Math.floor(v / (1024 * 1024)) & 0xfffff, v & 0xfffff];
     }
 
     /** Returns a slice id for a given composite slice. */
@@ -182,6 +190,9 @@ class STRelative {
             return id;
         }
         id = this.nextSliceId;
+        if (id >= 1024 * 1024) {
+            throw new Error("Too many slices; cannot issue more.");
+        }
         this.nextSliceId += 1;
         this.slicesKI.set(key, id);
         this.slicesIK.set(id, key);
