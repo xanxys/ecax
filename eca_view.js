@@ -25,6 +25,7 @@ const toSINumber = (n, precision) => {
     return `${sign ? "" : "-"}${mantissa.toFixed(precAfterDot)}${units[unitIndex]}`;
 };
 
+
 const BLOCK_WIDTH_PX = 128;
 const BLOCK_HEIGHT_PX = 64;
 const BLOCK_MIN_BS = 7;
@@ -46,8 +47,14 @@ class ECAView {
 
         // setupGUI
         // adjust canvas size
-        this.$el[0].width = $('#col_eca').width();
-        this.$el[0].height = $(window).height() - 150;
+        this.canvasWidth = $('#col_eca').width();
+        this.canvasHeight = $(window).height() - 150;
+        this.$el[0].width = this.canvasWidth;
+        this.$el[0].height = this.canvasHeight;
+
+        this.bufferCanvasNumBlocksW = Math.ceil(this.canvasWidth / BLOCK_WIDTH_PX) + 1;
+        this.bufferCanvasNumBlocksH = Math.ceil(this.canvasHeight / BLOCK_HEIGHT_PX) + 1;
+        this.bufferCanvas = new OffscreenCanvas(this.bufferCanvasNumBlocksW * BLOCK_WIDTH_PX, this.bufferCanvasNumBlocksH * BLOCK_HEIGHT_PX);
 
         this.$el.on('mousewheel', event => {
             event.preventDefault();
@@ -217,23 +224,14 @@ class ECAView {
         ctx.rect(0, 0, this.$el[0].width, this.$el[0].height);
         ctx.fill();
 
-        // Draw ECA blocks
+        // Draw ECA.
         const tr = new Timeout(0.1);
         ctx.save();
         ctx.translate(this.tx, this.ty);
         ctx.scale(this.zoom, this.zoom);
-
-        const blocks = this.getVisibleBlocks();
+        const bufferOffset = this._updateOffscreenBuffer(0.05);
         ctx.imageSmoothingEnabled = this.zoom < 4;
-        blocks.forEach(block => {
-            if (block.image) {
-                ctx.drawImage(block.image, block.x0, block.y0, block.w, block.h);
-            } else {
-                ctx.fillStyle = "#edf5f4";
-                ctx.fillRect(block.x0, block.y0, block.w, block.h);
-            }
-            
-        });
+        ctx.drawImage(this.bufferCanvas, bufferOffset.x0, bufferOffset.y0, bufferOffset.w, bufferOffset.h);
         ctx.restore();
 
         // Draw ruler (10x10 - 10x100)
@@ -271,9 +269,9 @@ class ECAView {
     }
 
     /**
-     * @returns {object[]} [{x0: number, y0: number, w: number, h: number, image: ImageData}] image could undefined (when being computed)
+     * @returns {object} {x0:number, y0:number, w:number, h:number} Rectangle in ECA coordinates where offscreenBuffer should be drawn.
      */
-    getVisibleBlocks() {
+    _updateOffscreenBuffer(timeoutSec) {
         // Select block size such that each block px results in [1, 2) px in rendered canvas.
         // When zoomed in a lot (single cell occupies multiple pixels), BLOCK_MIN_BS is used.
         const targetBs = Math.max(BLOCK_MIN_BS, 1 + Math.floor(Math.log2(BLOCK_WIDTH_PX / this.zoom)));
@@ -287,19 +285,17 @@ class ECAView {
         const iy0 = Math.max(0, Math.floor(win.y0 / blockHeight)); // inclusive
         const iy1 = Math.max(0, Math.ceil(win.y1 / blockHeight)); // non-inclusive
 
-        const result = [];
-        const timeout = new Timeout(0.05);
+        const blocks = [];
+        const timeout = new Timeout(timeoutSec);
         try {
             for (let iy = iy0; iy < iy1; iy++) {
                 for (let ix = ix0; ix < ix1; ix++) {
                     const blockId = this.stb.getBlockAt(ix * blockWidth, iy * blockHeight, targetBs).id;
                     this._computeBlockImage(blockId, timeout);
-                    result.push({
-                        x0: ix * blockWidth,
-                        y0: iy * blockHeight,
-                        w: blockWidth,
-                        h: blockHeight,
-                        image: this.blockImageCache.get(blockId)
+                    blocks.push({
+                        dix: ix - ix0,
+                        diy: iy - iy0,
+                        imageData: this.blockImageDataCache.get(blockId)
                     });
                 }
             }
@@ -310,7 +306,22 @@ class ECAView {
                 throw e;
             }
         }
-        return result;
+
+        // render
+        const ctxBuf = this.bufferCanvas.getContext("2d");
+        ctxBuf.fillStyle = "#edf5f4"; // "being-computed" color
+        ctxBuf.fillRect(0, 0, this.bufferCanvasNumBlocksW * BLOCK_WIDTH_PX, this.bufferCanvasNumBlocksH * BLOCK_HEIGHT_PX);
+
+        blocks.forEach(block => {
+            ctxBuf.putImageData(block.imageData, block.dix * BLOCK_WIDTH_PX, block.diy * BLOCK_HEIGHT_PX);
+        });
+
+        return {
+            x0: ix0 * blockWidth,
+            y0: iy0 * blockHeight,
+            w: this.bufferCanvasNumBlocksW * blockWidth,
+            h: this.bufferCanvasNumBlocksH * blockHeight
+        };
     }
 
     /**
@@ -322,9 +333,9 @@ class ECAView {
         // p<ECA> = (p<canvas> - t) / zoom
         return {
             x0: (-this.tx) / this.zoom,
-            x1: (this.$el[0].width - this.tx) / this.zoom,
+            x1: (this.canvasWidth - this.tx) / this.zoom,
             y0: Math.max(0, (-this.ty) / this.zoom),
-            y1: (this.$el[0].height - this.ty) / this.zoom,
+            y1: (this.canvasHeight - this.ty) / this.zoom,
         };
     }
 }
