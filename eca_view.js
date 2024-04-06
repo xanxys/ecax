@@ -226,7 +226,13 @@ class ECAView {
         const blocks = this.getVisibleBlocks();
         ctx.imageSmoothingEnabled = this.zoom < 4;
         blocks.forEach(block => {
-            ctx.drawImage(block.image, block.x0, block.y0, block.w, block.h);
+            if (block.image) {
+                ctx.drawImage(block.image, block.x0, block.y0, block.w, block.h);
+            } else {
+                ctx.fillStyle = "#edf5f4";
+                ctx.fillRect(block.x0, block.y0, block.w, block.h);
+            }
+            
         });
         ctx.restore();
 
@@ -265,7 +271,7 @@ class ECAView {
     }
 
     /**
-     * @returns {object[]} [{x0: number, y0: number, w: number, h: number, image: ImageData}]
+     * @returns {object[]} [{x0: number, y0: number, w: number, h: number, image: ImageData}] image could undefined (when being computed)
      */
     getVisibleBlocks() {
         // Select block size such that each block px results in [1, 2) px in rendered canvas.
@@ -288,16 +294,13 @@ class ECAView {
                 for (let ix = ix0; ix < ix1; ix++) {
                     const blockId = this.stb.getBlockAt(ix * blockWidth, iy * blockHeight, targetBs).id;
                     this._computeBlockImage(blockId, timeout);
-                    const image = this.blockImageCache.get(blockId);
-                    if (image !== undefined) {
-                        result.push({
-                            x0: ix * blockWidth,
-                            y0: iy * blockHeight,
-                            w: blockWidth,
-                            h: blockHeight,
-                            image: image
-                        });
-                    }
+                    result.push({
+                        x0: ix * blockWidth,
+                        y0: iy * blockHeight,
+                        w: blockWidth,
+                        h: blockHeight,
+                        image: this.blockImageCache.get(blockId)
+                    });
                 }
             }
         } catch (e) {
