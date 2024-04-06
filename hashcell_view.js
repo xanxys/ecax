@@ -444,7 +444,7 @@ const HashCellView = Backbone.View.extend({
     getVisibleBlocks() {
         // Select block size such that each block px results in [1, 2) px in rendered canvas.
         // When zoomed in a lot (single cell occupies multiple pixels), BLOCK_MIN_BS is used.
-        const targetBs = Math.max(BLOCK_MIN_BS, 2 + Math.floor(Math.log2(BLOCK_WIDTH_PX / this.zoom)));
+        const targetBs = Math.max(BLOCK_MIN_BS, 1 + Math.floor(Math.log2(BLOCK_WIDTH_PX / this.zoom)));
 
         const blockWidth = 2 ** targetBs;
         const blockHeight = 2 ** (targetBs - 1);
