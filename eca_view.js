@@ -42,7 +42,7 @@ class ECAView {
         this.ty = 0;
 
         // block cache
-        this.blockImageDataCache = new Map(); // block id -> ImageData
+        this.blockImageDataCache = new LRUMap(50_000);  // block id -> ImageData. 50k blocks is about 1.6GB of image data.
 
         // setupGUI
         // adjust canvas size
@@ -63,7 +63,7 @@ class ECAView {
 
             const centerXECA = (event.offsetX - this.tx) / this.zoom;
             const centerYECA = (event.offsetY - this.ty) / this.zoom;
-            this.zoom = Math.min(10, Math.max(1e-8, this.zoom * (1 + event.deltaY * 0.1)));
+            this.zoom = Math.min(10, Math.max(1e-12, this.zoom * (1 + event.deltaY * 0.1)));
 
             this.tx = event.offsetX - centerXECA * this.zoom;
             this.ty = event.offsetY - centerYECA * this.zoom;
@@ -114,8 +114,9 @@ class ECAView {
     _computeBlockImage(blockId, timeout) {
         const TRUE_CELL_COL = 100;
         const FALSE_CELL_COL = 255;
-        if (this.blockImageDataCache.has(blockId)) {
-            return this.blockImageDataCache.get(blockId);
+        const cache = this.blockImageDataCache.get(blockId);
+        if (cache !== undefined) {
+            return cache;
         }
 
         const block = this.stb.getBlockById(blockId, timeout);
@@ -204,13 +205,22 @@ class ECAView {
         }
     }
 
-    redraw() {
+    _redraw() {
         if (this.stb === null) {
             setTimeout(() => {
-                this.redraw();
+                this._redraw();
             }, 100);
             return;
         }
+
+        const t = Date.now() / 1000;
+        if (this.lastStat === undefined || t > this.lastStat + 5) {
+            const strel = this.stb.strel;
+            const stabs = this.stb.st;
+            console.log(`EV: ${this.blockImageDataCache.size()} blocks / STA: ${stabs.sliceCache.size()} slices / STR: ${strel.slicesIK.size} slices + ${strel.nexts.size} nexts`)
+            this.lastStat = t;
+        }
+
 
         const ctx = this.$el[0].getContext('2d');
 
@@ -255,12 +265,12 @@ class ECAView {
         ctx.restore();
 
         setTimeout(() => {
-            this.redraw();
+            this._redraw();
         }, 100);
     }
 
     _run() {
-        this.redraw();
+        this._redraw();
     }
 
     /**
@@ -285,7 +295,7 @@ class ECAView {
         try {
             for (let iy = iy0; iy < iy1; iy++) {
                 for (let ix = ix0; ix < ix1; ix++) {
-                    const blockId = this.stb.getBlockAt(ix * blockWidth, iy * blockHeight, targetBs).id;
+                    const blockId = this.stb.getBlockAt(ix * blockWidth, iy * blockHeight, targetBs, timeout).id;
                     this._computeBlockImage(blockId, timeout);
                     blocks.push({
                         dix: ix - ix0,

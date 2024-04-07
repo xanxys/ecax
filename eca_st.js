@@ -18,6 +18,128 @@ class Timeout {
 class TimeoutError {
 }
 
+/**
+ * Map with LRU (least-recently used) eviction policy.
+ */
+class LRUMap {
+    /**
+     * @typedef entry
+     * @param {entry} new the entry more recently referenced than this. null if this is the most recent.
+     * @param {entry} old the entry less recently referenced than this. null if this is the least recent.
+     * @param {any} val
+     * @param {any} key
+     */
+
+    constructor(maxSize) {
+        if (maxSize < 1) {
+            throw new Error("maxSize must be >= 1");
+        }
+        this.maxSize = maxSize;
+        this.ke = new Map(); // key -> entry
+        this.head = null;
+        this.tail = null;
+    }
+
+    size() {
+        return this.ke.size;
+    }
+
+    clear() {
+        this.ke.clear();
+        this.head = null;
+        this.tail = null;
+    }
+
+    /**
+     * 
+     * @param {*} k 
+     * @param {*} v 
+     */
+    set(k, v) {
+        // delete existing or excess entry.
+        let delTargetKey = null;
+        if (this.ke.has(k)) {
+            delTargetKey = k;
+        } else if (this.ke.size >= this.maxSize) {
+            delTargetKey = this.tail.key;
+        }
+        if (delTargetKey !== null) {
+            this._delete(this.ke.get(delTargetKey));
+            this.ke.delete(delTargetKey);
+        }
+        this._insertNewHead(k, v);
+    }
+
+    /**
+     * Retrieve value corresponding to the key.
+     * 
+     * @param {string | number} k 
+     * @returns {any | undefined} value if found, otherwis undefined.
+     */
+    get(k) {
+        const e = this.ke.get(k);
+        if (e === undefined) {
+            return undefined;
+        }
+        this._delete(e);
+        this.ke.delete(k);
+        this._insertNewHead(k, e.val);
+        return e.val;
+    }
+
+    _insertNewHead(k, v) {
+        if (this.head === null) {
+            // first entry
+            const e = {
+                new: null,
+                old: null,
+                key: k,
+                val: v,
+            };
+            this.head = e;
+            this.tail = e;
+            this.ke.set(k, e);
+        } else {
+            // non-first entry
+            const e = this._insertBefore(this.head, k, v);
+            this.head = e;
+            this.ke.set(k, e);
+        }
+    }
+
+    _delete(e) {
+        // remove from head & tail
+        if (this.head === e) {
+            this.head = this.head.old;
+        }
+        if (this.tail === e) {
+            this.tail = this.tail.new;
+        }
+
+        // remove from list
+        if (e.new !== null) {
+            e.new.old = e.old;
+        }
+        if (e.old !== null) {
+            e.old.new = e.new;
+        }
+    }
+
+    _insertBefore(target, k, v) {
+        const e = {
+            new: target.new,
+            old: target,
+            key: k,
+            val: v,
+        };
+        if (target.new !== null) {
+            target.new.old = e;
+        }
+        target.new = e;
+        return e;
+    }
+}
+
 
 /**
  * Space-time fragments of ECA with specific rule.
@@ -247,7 +369,7 @@ class STAbsolute {
         this.initLCyc = initLCyc || [false];
         this.initRCyc = initRCyc || [false];
 
-        this.sliceCache = new Map(); // key (format: "x:t:bs") -> slice id
+        this.sliceCache = new LRUMap(1_000_000);  // key (format: "x:t:bs") -> slice id
     }
 
     /**
